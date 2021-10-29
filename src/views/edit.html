@@ -1,0 +1,35 @@
+<template>
+  <div class="Edit">
+    <App-Nav />
+    <App-Header />
+    <App-Form />
+    <App-Footer/>
+  </div>
+</template>
+
+<script>
+  import Nav from "../components/layout/nav";
+  import Header from "../components/layout/header";
+  import Footer from "../components/layout/footer";
+  import Form from "../components/form";
+  import bg from "../assets/bg.webp";
+
+  export default class Edit {
+    render() {}
+  }
+</script>
+
+<style lang="scss">
+  .Edit {
+    background-image: url(${bg});
+    background-repeat: no-repeat;
+    min-height: 100vh;
+    background-size: cover;
+    background-position: center;
+    .Form{
+      .saveBtn{
+        display: none;
+      }
+    }
+  }
+</style>

@@ -1,0 +1,540 @@
+<template>
+  <div class="Notes one-light one-dark">
+    <ul class="Notes__inner"></ul>
+  </div>
+</template>
+
+<script>
+  import { debug, setTemp, $ } from "olum-helpers";
+  import router from "../router/index.js";
+  import edit from "../assets/edit.svg";
+  import sort from "../assets/sort.svg";
+  import api from "../services/api.js";
+  import delNote from "../services/delnote.js";
+  import getCurrentTab from "../services/current.js";
+  import deselect from "../services/deselect.js";
+  import marked from "marked";
+  import * as hljs from "../../public/highlight.js";
+  import { engine } from "../services/engine.js";
+  export default class Notes {
+    start = null;
+    end = null;
+    isActive = false;
+    currentMatch = 0;
+    isMatchedNoteNavigatable = false;
+    constructor() {}
+    temp = `
+      <li class="Notes__inner__note" data-noteid="{{noteId}}" draggable="true">
+        <button type="button" class="Notes__inner__note--editBtn"><img src="${edit}" alt="edit-pen" /></button>
+        <button type="button" class="Notes__inner__note--dragBtn"><img src="${sort}" alt="sort-icon" /></button>
+
+        <span class="Notes__inner__note--selectBtn">
+          <label>
+            <input type="checkbox" />
+            <span class="check"></span>
+          </label>
+        </span>
+
+        <div class="Notes__inner__note__text">{{noteContent}}</div>
+      </li>
+      `;
+
+
+    render() {
+      const container = $(".Notes__inner");
+      const navBtnsContainer = $(".navigation");
+      this.container = container;
+      getCurrentTab();
+      this.displayNotes();
+      window.on(api.event, () => {
+        getCurrentTab();
+        this.displayNotes();
+      });
+      // events
+      container.on("input", e => this.blurSelectAll(e));
+      window.on(delNote.event, () => this.deleteNote());
+      container.on("click", e => this.toEdit(e));
+      // drag events
+      container.on("dragstart", e => this.dragStart(e));
+      container.on("dragend", e => this.dragEnd(e));
+      container.on("dragenter", e => this.dragEnter(e));
+      container.on("dragover", e => this.dragOver(e));
+      container.on("drop", e => this.dragDrop(e));
+      container.on("dragleave", e => this.dragLeave(e));
+      container.on("mousemove", e => this.handleDrag(e));
+      // engine
+      window.on(engine.event, () => this.displayFilteredNotes(engine.query));
+      navBtnsContainer.on("click", e => this.navigateMatches(e));
+    }
+
+    displayNotes() {
+      const container = $(".Notes__inner");
+      const data = api.get();
+      const notes = data
+        .sort((a, b) => (a.index > b.index ? 1 : -1))
+        .map(obj => {
+          if (obj.tabId === api.current.tabId) {
+            return setTemp(this.temp, {
+              noteId: obj.noteId,
+              noteContent: marked(obj.noteContent),
+            });
+          }
+        })
+        .join("");
+      container.innerHTML = notes;
+      hljs.highlightAll();
+    }
+
+    deactivateTab() {
+      const activeTab = $(".activeTab");
+      if (activeTab) activeTab.classList.remove("activeTab");
+    }
+
+    displayAllNotes() {
+      const container = $(".Notes__inner");
+      const data = api.get();
+      const notes = data
+        .sort((a, b) => (a.index > b.index ? 1 : -1))
+        .map(obj =>
+          setTemp(this.temp, {
+            noteId: obj.noteId,
+            noteContent: marked(obj.noteContent),
+          })
+        )
+        .join("");
+      container.innerHTML = notes;
+      hljs.highlightAll();
+    }
+
+    displayFilteredNotes(query) {
+      this.currentMatch = 0;
+      if (!!query) {
+        this.isMatchedNoteNavigatable = true;
+        this.deactivateTab();
+        this.displayAllNotes();
+        // replace matched query with mark tag
+        const allTags = $(".Notes__inner *", true);
+        allTags.forEach(tag => {
+          [...tag.childNodes]
+            .filter(n => n.nodeType === Node.TEXT_NODE)
+            .forEach(textNode => {
+              const text = textNode.textContent.lower().trim();
+              if (text.includes(query)) {
+                const wrapper = document.createElement("mark");
+                textNode.replaceWith(wrapper);
+                wrapper.append(textNode);
+              }
+            });
+        });
+        // scroll to 1st match
+        const mark = $(".Notes__inner mark");
+        if (mark) this.scroll(mark);
+      } else {
+        this.isMatchedNoteNavigatable = false;
+        this.deactivateTab();
+        this.displayAllNotes();
+      }
+    }
+
+    navigateMatches(e) {
+      const marks = $(".Notes__inner mark", true);
+      if (marks.length && this.isMatchedNoteNavigatable) {
+        if (e.target.classList.contains("nextBtn")) {
+          if (this.currentMatch < marks.length - 1) this.currentMatch++;
+        } else if (e.target.classList.contains("prevBtn")) {
+          if (this.currentMatch > 0) this.currentMatch--;
+          else if (this.currentMatch < 0) this.currentMatch = 0;
+        }
+        this.scroll(marks[this.currentMatch]);
+      }
+    }
+
+    scroll(elm) {
+      if (elm)
+        elm.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+          inline: "nearest",
+        });
+    }
+
+    blurSelectAll(e) {
+      if (e.target.nodeName === "INPUT") deselect();
+    }
+
+    deleteNote() {
+      const container = $(".Notes__inner");
+      const notes = $(container).get(".Notes__inner__note", true);
+      const notesArr = notes
+        .map(note => {
+          const input = $(note).get(".Notes__inner__note--selectBtn input");
+          if (input.checked) {
+            note.remove();
+            const noteId = note.getAttribute("data-noteid");
+            return noteId;
+          }
+        })
+        .filter(note => typeof note != "undefined");
+
+      // update notes number in current tab
+      const currentTab = $(".Tabs .activeTab");
+      if (currentTab) {
+        const currentNum = +$(currentTab).get(".tab__num").textContent.replace(/\D/g, "");
+        const updatedNum = currentNum - notesArr.length;
+        $(currentTab).get(".tab__num").textContent = `(${updatedNum})`;
+      }
+      api.removeNotes(notesArr);
+    }
+
+    toEdit(e) {
+      if (e.target.classList.contains("Notes__inner__note--editBtn")) {
+        const note = e.target.parentElement;
+        const id = note.getAttribute("data-noteid");
+        const content = $(note).get(".Notes__inner__note__text").textContent;
+        api.editedNote.id = id;
+        api.editedNote.content = content;
+        router.navigate("/edit");
+      }
+    }
+
+    handleDrag(e) {
+      const lis = $(".Notes__inner__note", true);
+      if (e.target.classList.contains("Notes__inner__note--dragBtn")) {
+        lis.forEach(li => li.setAttribute("draggable", "true"));
+        this.isActive = true;
+      } else {
+        lis.forEach(li => li.setAttribute("draggable", "false"));
+        this.isActive = false;
+      }
+    }
+
+    dragStart(e) {
+      if (e.target.classList.contains("Notes__inner__note") && this.isActive) {
+        this.start = e.target;
+        debug(["start", $(this.start).get(".Notes__inner__note__text").textContent]);
+        this.start.classList.add("hold");
+        setTimeout(() => this.start.classList.add("hide"), 0);
+      }
+    }
+
+    dragEnd(e) {
+      if (e.target.classList.contains("Notes__inner__note") && this.isActive) {
+        debug(["end", $(e.target).get(".Notes__inner__note__text").textContent]);
+        [...this.container.children].forEach(child => (child.className = "Notes__inner__note"));
+        this.arrange();
+      }
+    }
+
+    arrange() {
+      if (this.start && this.end) {
+        if (!this.end.nextElementSibling) {
+          this.end.insertAdjacentElement("afterend", this.start);
+        } else {
+          this.end.insertAdjacentElement("beforebegin", this.start);
+        }
+      }
+
+      const nodes = [...this.container.children];
+      const sortedArr = nodes.map(node => {
+        const noteId = node.getAttribute("data-noteid");
+        const index = nodes.indexOf(node);
+        return {
+          noteId,
+          index,
+        };
+      });
+
+      api.arrange(sortedArr);
+    }
+
+    dragEnter(e) {
+      if (e.target.classList.contains("Notes__inner__note") && this.isActive) {
+        e.preventDefault();
+        this.end = e.target;
+        debug(["enter", $(this.end).get(".Notes__inner__note__text").textContent]);
+        e.target.classList.add("hover");
+      }
+    }
+
+    dragOver(e) {
+      if (e.target.classList.contains("Notes__inner__note") && this.isActive) {
+        e.preventDefault();
+        this.end = e.target;
+        debug(["over", $(this.end).get(".Notes__inner__note__text").textContent]);
+        e.target.classList.add("hover");
+      }
+    }
+
+    dragDrop(e) {
+      if (e.target.classList.contains("Notes__inner__note") && this.isActive) {
+        this.end = e.target;
+        debug(["drop", $(this.end).get(".Notes__inner__note__text").textContent]);
+      }
+    }
+
+    dragLeave(e) {
+      if (e.target.classList.contains("Notes__inner__note") && this.isActive) {
+        e.target.classList.remove("hover");
+      }
+    }
+  }
+</script>
+
+<style lang="scss">
+  .Notes {
+    background-color: $white;
+    position: absolute;
+    left: 0;
+    top: 100px;
+    height: calc(100% - 150px);
+    width: 100%;
+    overflow: auto;
+    border-right: 1px solid $border4;
+
+    &::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: $blue;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: $border4;
+    }
+
+    &__inner {
+      &__note {
+        overflow: hidden;
+        padding: 10px;
+        border-bottom: 1px solid $border1;
+        position: relative;
+
+        &.hover {
+          &::after {
+            position: absolute;
+            content: "";
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba($yellow, 0.7);
+          }
+        }
+
+        &.hold {
+          width: 300px !important;
+          height: 100px !important;
+          overflow: hidden !important;
+          border: 2px solid $subTextColor !important;
+          border-radius: $radius !important;
+        }
+
+        &.hide {
+          display: none;
+        }
+
+        &:last-of-type {
+          border-bottom: none;
+        }
+
+        &--dragBtn,
+        &--selectBtn,
+        &--editBtn,
+        &__text {
+          float: left;
+        }
+
+        &--dragBtn {
+          cursor: grab;
+          width: 30px;
+          height: 30px;
+          margin: 0 20px;
+          border: 1px solid $border3;
+          border-radius: $radius;
+          user-select: none;
+
+          img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+          }
+        }
+
+        &--editBtn {
+          width: 30px;
+          height: 30px;
+          user-select: none;
+
+          img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+          }
+        }
+
+        &--selectBtn {
+          height: 30px;
+          width: 30px;
+          float: left;
+          box-sizing: content-box;
+
+          label {
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+            float: left;
+
+            &:hover .check {
+              background: $border3;
+            }
+
+            input {
+              position: absolute;
+              opacity: 0;
+              width: 0;
+              height: 0;
+
+              &:checked ~ .check {
+                background: $green;
+                border: 1px solid $green;
+
+                &:after {
+                  opacity: 1;
+                }
+              }
+            }
+
+            .check {
+              position: relative;
+              width: 100%;
+              height: 100%;
+              background: $white;
+              border: 1px solid $border3;
+              transition: all 0.1s ease-in-out;
+              float: left;
+              border-radius: 50%;
+
+              &:after {
+                content: "";
+                position: absolute;
+                top: 6px;
+                right: 10px;
+                width: 8px;
+                height: 14px;
+                border: solid $white;
+                border-width: 0 3px 3px 0;
+                transform: rotate(45deg);
+                box-sizing: border-box;
+                opacity: 0;
+                transition: opacity 0.1s ease-in-out;
+              }
+            }
+          }
+        }
+
+        &__text {
+          width: 100%;
+          display: block;
+          padding-top: 10px;
+          line-height: 25px;
+          word-break: break-all;
+          color: $mainTextColor;
+
+          pre {
+            background: $oneLight;
+            padding: 16px;
+            overflow: auto;
+            font-size: 85%;
+            line-height: 1.45;
+            border-radius: $radius;
+            margin-top: 0;
+            margin-bottom: 16px;
+            word-break: normal;
+            white-space: pre;
+            word-wrap: normal;
+
+            code {
+              padding: 0;
+              padding-right: 16px;
+              float: left;
+            }
+          }
+
+          h1,
+          h2,
+          h3,
+          h4,
+          h5,
+          h6 {
+            margin-top: 24px;
+            margin-bottom: 16px;
+            code {
+              background-color: $quoteBgColor;
+              padding: 0.2em 0.4em;
+              border-radius: $radius;
+            }
+          }
+
+          h1,
+          h2 {
+            padding-bottom: 0.3em;
+            border-bottom: 1px solid $border;
+          }
+
+          h6 {
+            color: $subTextColor;
+          }
+
+          b {
+            font-weight: 600;
+          }
+
+          blockquote {
+            padding: 0 1em;
+            color: $subTextColor;
+            border-left: 0.25em solid $border;
+            margin-top: 0;
+            margin-bottom: 16px;
+            p {
+              display: inline-block;
+            }
+          }
+
+          ul li code,
+          blockquote p code {
+            padding: 0.2em 0.4em;
+            margin: 0;
+            font-size: 85%;
+            background-color: $quoteBgColor;
+            border-radius: $radius;
+            display: inline;
+          }
+
+          blockquote p {
+            line-height: 26px;
+          }
+
+          code.language-javascript {
+            background-color: transparent;
+          }
+
+          ul {
+            list-style-position: inside;
+            list-style-type: disc;
+            padding-left: 15px;
+            li {
+              line-height: 26px;
+            }
+          }
+
+          a {
+            color: $blue;
+          }
+        }
+      }
+    }
+  }
+</style>

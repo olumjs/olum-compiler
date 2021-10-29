@@ -1,0 +1,512 @@
+<template>
+  <div class="Tabs">
+    <div class="innerTabs">
+      <!-- dots -->
+      <div class="dots">
+        <span class="min"></span>
+        <span class="mid"></span>
+        <span class="max"></span>
+      </div>
+
+      <!-- slider -->
+      <div class="slider"></div>
+
+      <!-- add tab -->
+      <button type="button" class="addTab flash">${this.plus}</button>
+    </div>
+  </div>
+</template>
+
+<script>
+  import { $, debug, setTemp } from "olum-helpers";
+  import genID from "../services/id.js";
+  import api from "../services/api.js";
+  import getCurrentTab from "../services/current.js";
+  export default class Tabs {
+    plus = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><path d="M416 208H272V64c0-17.67-14.33-32-32-32h-32c-17.67 0-32 14.33-32 32v144H32c-17.67 0-32 14.33-32 32v32c0 17.67 14.33 32 32 32h144v144c0 17.67 14.33 32 32 32h32c17.67 0 32-14.33 32-32V304h144c17.67 0 32-14.33 32-32v-32c0-17.67-14.33-32-32-32z"></path></svg>`;
+    close = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 352 512"><path d="M242.72 256l100.07-100.07c12.28-12.28 12.28-32.19 0-44.48l-22.24-22.24c-12.28-12.28-32.19-12.28-44.48 0L176 189.28 75.93 89.21c-12.28-12.28-32.19-12.28-44.48 0L9.21 111.45c-12.28 12.28-12.28 32.19 0 44.48L109.28 256 9.21 356.07c-12.28 12.28-12.28 32.19 0 44.48l22.24 22.24c12.28 12.28 32.2 12.28 44.48 0L176 322.72l100.07 100.07c12.28 12.28 32.2 12.28 44.48 0l22.24-22.24c12.28-12.28 12.28-32.19 0-44.48L242.72 256z"/></svg>`;
+    temp = `
+      <span class="tab" data-tabid="{{tabId}}">
+        <span class="tab__num">({{notesNum}})</span>
+        <input type="text" class="tab__title" value="{{tabName}}" placeholder="{{tabName}}" readonly />
+        <button type="button" class="tab--closeBtn">${this.close}</button>
+      </span>
+      `;
+    startX = 0;
+    currentX = 0;
+    isDown = false;
+    isActive = false;
+    walk = 0;
+    scrollLeft = 0;
+    tabWidth = 250;
+    oldTap = 0;
+    dblClickTimeout = 500;
+
+    render() {
+      this.slider = $(".Tabs .slider");
+      const addBtn = $(".addTab");
+      const dots = $(".dots");
+
+      this.buildTabs();
+      this.initial();
+
+      dots.on("click", e => this.triggerWidth(e));
+      addBtn.on("click", () => this.addNewTab());
+      this.slider.on("click", e => this.activateTab(e));
+      this.slider.on("click", e => this.removeTab(e));
+      this.slider.on("click", e => this.editTab(e));
+      document.on("mousemove", e => this.blurTab(e));
+      document.on("touchmove", e => this.blurTab(e));
+      // slider
+      this.slider.on("touchstart", e => this.dragStart(e));
+      this.slider.on("mousedown", e => this.dragStart(e));
+      this.slider.on("touchend", e => this.dragEnd(e));
+      this.slider.on("mouseup", e => this.dragEnd(e));
+      this.slider.on("touchmove", e => this.dragMove(e));
+      this.slider.on("mousemove", e => this.dragMove(e));
+      this.slider.on("wheel", e => this.scroll(e));
+      this.slider.on("mouseleave", () => (this.isActive = false));
+    }
+
+    checker() {
+      let item;
+      if (localStorage.getItem("size") === null) {
+        localStorage.setItem("size", JSON.stringify("max"));
+        item = "max";
+      } else {
+        item = JSON.parse(localStorage.getItem("size"));
+      }
+      return item;
+    }
+
+    initial() {
+      const container = $(".Browser");
+      const status = this.checker();
+      let num;
+      if (status === "min") num = 320;
+      else if (status === "mid") num = 720;
+      else if (status === "max") num = window.innerWidth - 35;
+      container.style.width = num + "px";
+    }
+
+    triggerWidth(e) {
+      if (e.target.nodeName === "SPAN") {
+        const container = $(".Browser");
+        let num;
+        const type = e.target.className;
+        switch (type) {
+          case "min":
+            num = 320;
+            localStorage.setItem("size", JSON.stringify("min"));
+            break;
+          case "mid":
+            num = 720;
+            localStorage.setItem("size", JSON.stringify("mid"));
+            break;
+          case "max":
+            num = window.innerWidth - 35;
+            localStorage.setItem("size", JSON.stringify("max"));
+            break;
+        }
+        container.style.width = num + "px";
+      }
+    }
+
+    flash() {
+      const addBtn = $(".addTab");
+      const tabs = $(".tab", true);
+      if (tabs.length) {
+        addBtn.classList.remove("flash");
+      } else {
+        addBtn.classList.add("flash");
+      }
+    }
+
+    buildTabs() {
+      const data = api.get();
+      const tabs = [...new Set(data.map(obj => obj.tabId))].map(id => data.find(obj => (obj.tabId === id ? obj : false)));
+      const tabsMarkup = tabs
+        .map(obj => {
+          const num = api.getNotesNum(obj.tabId);
+          return setTemp(this.temp, { ...obj, notesNum: num });
+        })
+        .reverse()
+        .join("");
+      this.slider.innerHTML = tabsMarkup;
+      this.flash();
+
+      this.selectLastOpenedTab();
+    }
+
+    selectLastOpenedTab() {
+      if (!api.hasLastTab()) {
+        this.selectFirstTab();
+      } else {
+        const tab = $(`[data-tabid="${api.hasLastTab()}"]`);
+        if (tab) {
+          tab.classList.add("activeTab");
+          getCurrentTab();
+          tab.scrollIntoView();
+        } else {
+          this.selectFirstTab();
+        }
+      }
+      const activeTab = $(".activeTab");
+      if (activeTab) activeTab.click();
+    }
+
+    selectFirstTab() {
+      const tab = $(".Tabs .tab");
+      if (tab) {
+        tab.classList.add("activeTab");
+        getCurrentTab();
+      }
+    }
+
+    addNewTab() {
+      $(".tab", true).forEach(tab => tab.classList.remove("activeTab"));
+
+      const id = genID();
+      const name = "New Tab";
+      const obj = {
+        tabName: "New Tab",
+        tabId: id,
+        notesNum: 0,
+      };
+
+      const tab = setTemp(this.temp, obj);
+      this.slider.insertAdjacentHTML("afterbegin", tab);
+      this.flash();
+      const _tab = $(this.slider).get(".tab");
+      if (_tab) {
+        _tab.classList.add("activeTab");
+        _tab.click();
+        _tab.scrollIntoView({
+          behavior: "smooth",
+        });
+      }
+
+      getCurrentTab();
+    }
+
+    activateTab(e) {
+      if (e.target.classList.contains("tab")) {
+        $(".tab", true).forEach(tab => tab.classList.remove("activeTab"));
+        e.target.classList.add("activeTab");
+        getCurrentTab();
+        api.trigger();
+        api.saveLastTab();
+
+        // wipe out engine
+        const container = $(".searchMatches");
+        const input = $(".searchInput");
+        container.classList.add("hide");
+        input.value = "";
+      }
+    }
+
+    removeTab(e) {
+      if (e.target.classList.contains("tab--closeBtn")) {
+        const tab = e.target.parentElement;
+        const prevTab = tab.previousElementSibling;
+        const nextTab = tab.nextElementSibling;
+        const id = tab.getAttribute("data-tabid");
+
+        if (confirm("are you sure?")) {
+          tab.remove();
+          api.removeTab(id);
+          this.flash();
+          $(".Notes__inner").innerHTML = "";
+
+          // select nearest tab
+          if (prevTab) {
+            prevTab.click();
+          } else if (!prevTab && nextTab) {
+            nextTab.click();
+          } else {
+            debug("no tabs found!");
+          }
+        }
+      }
+    }
+
+    editTab(e) {
+      if (e.target.classList.contains("tab")) {
+        const tab = e.target;
+        const input = $(tab).get(".tab__title");
+        const newTap = new Date().getTime();
+        const interval = newTap - this.oldTap;
+        if (interval > 0 && interval < this.dblClickTimeout) {
+          this.handleTabTitle(input, true);
+          input.focus();
+          input.on("input", () => {
+            getCurrentTab();
+            api.editTab();
+          });
+        }
+        this.oldTap = newTap;
+      }
+    }
+
+    handleTabTitle(elm, status) {
+      if (status) {
+        elm.removeAttribute("readonly");
+        elm.style.pointerEvents = "initial";
+      } else {
+        elm.setAttribute("readonly", "readonly");
+        elm.style.pointerEvents = "none";
+      }
+    }
+
+    blurTab(e) {
+      if (e.target.classList.contains("tab__title")) {
+        const input = e.target;
+        input.on("blur", () => this.handleTabTitle(input, false));
+      }
+    }
+
+    scroll(e) {
+      e = e || window.event;
+      this.slider.scrollLeft += e.deltaY;
+    }
+
+    dragStart(e) {
+      e = e || window.event;
+      this.isDown = true;
+      this.isActive = true;
+      if (e.type == "mousedown") {
+        this.startX = e.pageX - this.slider.offsetLeft;
+      } else {
+        this.startX = e.touches[0].pageX - this.slider.offsetLeft;
+      }
+      this.scrollLeft = this.slider.scrollLeft;
+    }
+
+    dragEnd(e) {
+      e = e || window.event;
+      this.isDown = false;
+      this.isActive = false;
+    }
+
+    dragMove(e) {
+      e = e || window.event;
+      if (this.isDown && this.isActive) {
+        if (e.type == "mousemove") {
+          this.currentX = e.pageX - this.slider.offsetLeft;
+        } else {
+          this.currentX = e.touches[0].pageX - this.slider.offsetLeft;
+        }
+        this.walk = this.currentX - this.startX;
+        this.slider.scrollLeft = this.scrollLeft - this.walk;
+      }
+    }
+  }
+
+</script>
+
+<style lang="scss">
+  $dotSize: 15;
+  $dotsWrapperWidth: 80;
+  $dotsWrapperHeight: 40;
+  /* $marginTop: ($dotsWrapperHeight - $dotSize) / 2;
+  $marginLeft: ($dotsWrapperWidth - $dotSize * 3) / 6; */
+  $marginTop: 32.5;
+  $marginLeft: 10.833333333;
+  .Tabs {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 50px;
+    width: 100%;
+    background: $offWhite;
+    border-radius: $radius $radius 0 0;
+    border-bottom: 1px solid $border1;
+    user-select: none;
+
+    .innerTabs {
+      height: #{$dotsWrapperHeight}px;
+      margin-top: 10px;
+      padding: 0 10px;
+
+      .dots {
+        width: #{$dotsWrapperWidth}px;
+        height: 100%;
+        float: left;
+        margin-right: 10px;
+
+        span {
+          cursor: pointer;
+          width: #{$dotSize}px;
+          height: #{$dotSize}px;
+          margin: #{$marginTop}px #{$marginLeft}px;
+          border-radius: 50%;
+          float: left;
+
+          &:nth-of-type(1) {
+            background: $yellow;
+          }
+
+          &:nth-of-type(2) {
+            background: $red;
+          }
+
+          &:nth-of-type(3) {
+            background: $green;
+          }
+        }
+      }
+
+      .addTab {
+        width: 30px;
+        height: 30px;
+        float: left;
+        border-radius: 50%;
+        margin: 5px 0 5px 10px;
+        position: relative;
+
+        &.flash {
+          animation: addTab 1s cubic-bezier(0.66, 0, 0, 1) infinite;
+        }
+        &:hover {
+          background: $border3;
+          transition: all 0.1s ease-in-out;
+        }
+
+        svg {
+          pointer-events: none;
+          width: 14px;
+          height: 14px;
+          position: absolute;
+          fill: $subTextColor;
+          top: 50%;
+          left: 50%;
+          transform: translate(-50%, -50%);
+        }
+      }
+
+      .slider {
+        float: left;
+        width: calc(100% - 130px);
+        overflow: hidden;
+        white-space: nowrap;
+        height: 40px;
+
+        &:active {
+          cursor: grab;
+        }
+
+        .tab {
+          width: ${this.tabWidth}px; 
+          height: 40px;
+          line-height: 40px;
+          background: $white;
+          border: 1px solid $border4;
+          border-bottom-color: $border1;
+          border-radius: 10px 10px 0 0;
+          padding: 0 10px;
+          display: inline-block;
+          white-space: normal;
+
+          &__num {
+            float: left;
+            height: 30px;
+            margin: 5px 0;
+            line-height: 30px;
+            width: 40px;
+            text-align: center;
+            pointer-events: none;
+          }
+
+          &__title {
+            float: left;
+            height: 30px;
+            margin: 5px;
+            outline: none;
+            border: 1px solid $white;
+            text-indent: 10px;
+            width: calc(100% - 75px);
+            pointer-events: none;
+            text-overflow: ellipsis;
+            &:hover {
+              border-color: $border2;
+            }
+          }
+
+          &--closeBtn {
+            float: left;
+            width: 25px;
+            height: 25px;
+            margin: 7.5px 0;
+            border-radius: 50%;
+            &:hover {
+              background: $offWhite;
+            }
+            svg {
+              fill: $subTextColor;
+              pointer-events: none;
+              width: 15px;
+              height: 15px;
+              margin: 5px;
+            }
+          }
+
+          &.activeTab {
+            background-color: $activeTabColor;
+            border-color: $activeTabColor;
+
+            .tab__num {
+              color: $white;
+            }
+
+            .tab__title {
+              border: 1px solid $activeTabColor;
+              background-color: $activeTabColor;
+              color: $white;
+
+              &:hover {
+                border-color: $white;
+              }
+
+              &::placeholder {
+                /* Chrome, Firefox, Opera, Safari 10.1+ */
+                color: $red;
+                opacity: 1; /* Firefox */
+              }
+
+              &:-ms-input-placeholder {
+                /* Internet Explorer 10-11 */
+                color: $red;
+              }
+
+              &::-ms-input-placeholder {
+                /* Microsoft Edge */
+                color: $red;
+              }
+            }
+
+            .tab--closeBtn {
+              svg {
+                fill: $white;
+              }
+
+              &:hover {
+                background: $white;
+                svg {
+                  fill: $activeTabColor;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  @keyframes addTab {
+    0% {
+      box-shadow: inset 0 0 0 2px $blue;
+    }
+    100% {
+      box-shadow: inset 0 0 0 2px rgba($blue, 0);
+    }
+  }
+</style>

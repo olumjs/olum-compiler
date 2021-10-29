@@ -1,0 +1,100 @@
+<template>
+  <div class="AddNote">
+    <!-- add button -->
+    <button type="button" class="addBtn">
+      <img src="${add}" alt="addBtn" />
+      <span>add note</span>
+    </button>
+    <!-- settings button -->
+    <a to="/settings" class="settingsBtn">settings</a>
+    <!-- star button -->
+    <button type="button" class="starBtn" to="/features"><img src="${star}" alt="star" /></button>
+  </div>
+</template>
+
+<script>
+  import router from "../router/index.js";
+  import { $, debug } from "olum-helpers";
+  import add from "../assets/add.svg";
+  import star from "../assets/star.svg";
+  import getCurrentTab from "../services/current.js";
+  export default class AddNote {
+
+    render() {
+      const addBtn = $(".addBtn");
+      addBtn.on("click", () => this.addNewNote());
+    }
+
+    addNewNote() {
+      const hasTab = $(".Tabs .tab");
+      const hasActiveTab = getCurrentTab();
+      if (!hasTab) {
+        alert("add tab in order to add your note");
+      } else if (!hasActiveTab) {
+        alert("select a tab in order to add your note");
+      } else {
+        router.navigate("/add");
+      }
+    }
+  }
+</script>
+
+<style lang="scss">
+  .AddNote {
+    background-color: $white;
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    height: 50px;
+    width: 100%;
+    border-radius: 0 0 $radius $radius;
+    font-size: 17px;
+    border-top: 1px solid $border1;
+    user-select: none;
+    .addBtn {
+      height: 50px;
+      padding: 0 10px;
+      float: left;
+      img {
+        pointer-events: none;
+        float: left;
+        vertical-align: bottom;
+        height: 30px;
+        margin: 10px 10px 10px 0;
+      }
+      span {
+        pointer-events: none;
+        float: left;
+        height: 50px;
+        line-height: 50px;
+        text-transform: capitalize;
+        font-weight: bold;
+        color: $blue;
+      }
+    }
+    .starBtn {
+      float: right;
+      width: 30px;
+      height: 30px;
+      margin: 10px;
+      img {
+        width: auto;
+        height: 100%;
+        margin: 0 auto;
+      }
+    }
+    .settingsBtn {
+      float: right;
+      display: inline-block;
+      background: $blue;
+      height: 30px;
+      line-height: 30px;
+      padding: 0 15px;
+      border-radius: $radius;
+      margin: 10px;
+      color: white;
+      font-weight: bold;
+      text-transform: capitalize;
+    }
+  }
+</style>

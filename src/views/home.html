@@ -1,0 +1,35 @@
+<template>
+  <div class="Home">
+    <App-Nav />
+    <App-Header />
+    <App-Browser />
+    <App-Footer />
+  </div>
+</template>
+
+<script>
+  import bg from "../assets/bg.webp";
+  import Nav from "../components/layout/nav.js";
+  import Header from "../components/layout/header";
+  import Footer from "../components/layout/footer";
+  import Browser from "../components/browser";
+  class Home {
+    render() {}
+  }
+
+  export default Home;
+</script>
+
+<style lang="scss">
+  /* @import "../styles/foo.scss"; */
+ // @import "../styles/foo.scss";
+  /* @import "../styles/foo.scss"; */
+  
+  .Home {
+    background-image: linear-gradient(rgba(65, 127, 245, 0.5), rgba(65, 127, 245, 0.5)), url(${bg});
+    background-repeat: no-repeat;
+    min-height: 100vh;
+    background-size: cover;
+    background-position: center;
+  }
+</style>

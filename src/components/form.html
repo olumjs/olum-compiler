@@ -1,0 +1,134 @@
+<template>
+  <div class="Form">
+    <!-- head -->
+    <div class="header">
+      <button to="/" type="button" class="cancelBtn">cancel</button>
+      <button type="button" class="saveBtn">save</button>
+      <button type="button" class="updateBtn">update</button>
+    </div>
+    <!-- body -->
+    <div class="body">
+      <textarea></textarea>
+    </div>
+  </div>
+</template>
+
+<script>
+  import { $, debug } from "olum-helpers";
+  import api from "../services/api.js";
+  import router from "../router/index.js";
+  import genID from "../services/id.js";
+
+  export default class Form {
+    margin = 15;
+
+    render() {
+      this.route = router.getRoute();
+      const input = $(".Form textarea");
+      input.focus();
+      if (this.route.includes("add")) {
+        this.add();
+      } else if (this.route.includes("edit")) {
+        this.edit();
+      }
+    }
+
+    add() {
+      const input = $(".Form textarea");
+      const saveBtn = $(".Form .saveBtn");
+
+      saveBtn.on("click", () => {
+        const id = genID();
+        let content = input.value.trim();
+        if (content) {
+          api.current.noteId = id;
+          api.current.noteContent = content;
+          api.addNote(api.current);
+          router.navigate("/");
+        } else {
+          alert("empty field!");
+        }
+      });
+    }
+
+    edit() {
+      const input = $(".Form textarea");
+      const updateBtn = $(".Form .updateBtn");
+      const id = api.editedNote.id;
+      const oldContent = api.getOldNoteContent(id);
+      input.value = oldContent; // update form
+
+      updateBtn.on("click", () => {
+        let newContent = input.value.trim();
+        if (newContent) {
+          api.editNote({ newContent, id });
+          router.navigate("/");
+        } else {
+          alert("empty field!");
+        }
+      });
+    }
+  }
+</script>
+
+<style lang="scss">
+  .Form {
+    position: relative;
+    background: $white;
+    margin: 0 auto;
+    border-radius: $radius;
+    width: calc(100% - 20px);
+    height: calc(100vh - 159px);
+    .header {
+      height: 40px;
+      background-color: $offWhite;
+      border-bottom: 1px solid $border2;
+      border-radius: 5px 5px 0 0;
+
+      button {
+        text-align: center;
+        font-weight: 600;
+        text-transform: capitalize;
+        cursor: pointer;
+        transition: background 0.3s ease-in-out;
+        width: 80px;
+        height: 30px;
+        line-height: 30px;
+        border-radius: $radius;
+      }
+      .cancelBtn {
+        float: left;
+        background-color: $white;
+        color: $subTextColor;
+        margin: 5px 0 0 10px;
+        border: 1px solid $border2;
+      }
+
+      .saveBtn,
+      .updateBtn {
+        float: right;
+        margin: 5px 10px 0 0;
+        background-color: $blue;
+        color: $white;
+        border: 0;
+      }
+    }
+    .body {
+      height: calc(100% - 40px);
+      padding: 10px;
+      textarea {
+        width: 100%;
+        height: 100%;
+        padding: 10px;
+        border: 1px solid $border2;
+        border-radius: $radius;
+        resize: none;
+        transition: box-shadow 0.3s ease-in-out;
+        outline: none;
+        &:focus {
+          box-shadow: 0 0 1px 1px $blue;
+        }
+      }
+    }
+  }
+</style>
