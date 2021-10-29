@@ -2,6 +2,7 @@ const { exec } = require("child_process");
 const logger = require("./logger");
 const reload = require("./reload");
 const path = require("path");
+const spawn = require("cross-spawn");
 
 const bundle = mode => {
   const taskName = "bundle";
@@ -9,22 +10,14 @@ const bundle = mode => {
     const file = path.resolve(__dirname, "../node_modules/webpack/bin/webpack.js");
     logger(taskName, "start");
     if (mode === "development") {
-      exec(`webpack --env dev`, (error, stdout, stderr) => {
-        if (error) return reject(error);
-        if (stderr.trim() !== "") return reject(stderr);
-        if (stdout !== "webpack compiled successfully\n") console.log(stdout);
-        resolve();
-        reload();
-        logger(taskName, "end");
-      });
+      spawn.sync(file, ["--env", "dev"], { stdio: "inherit" } );
+      reload();
+      resolve();
+      logger(taskName, "end");
     } else if (mode === "production") {
-      exec(file, (error, stdout, stderr) => {
-        if (error) return reject(error);
-        if (stderr.trim() !== "") return reject(stderr);
-        if (stdout !== "webpack compiled successfully\n") console.log(stdout);
-        resolve();
-        logger(taskName, "end");
-      });
+      spawn.sync(file, { stdio: "inherit" } );
+      resolve();
+      logger(taskName, "end");
     }
   });
 };

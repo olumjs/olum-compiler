@@ -10,7 +10,7 @@ const { title, dest, favicon, template, src, hash, comments, polyfill, assetAsMo
 
 module.exports = env => {
   const mode = !!env.dev ? "development" : "production";
-  const globs = [`../../${src}/app.scss`, `../../${src}/app.js`];
+  const globs = [`./${src}/app.scss`, `./${src}/app.js`];
   // add devtool if it exists
   const devtoolExists = fs.existsSync(path.resolve(__dirname, "../../public/devtool.js"));
   if (mode === "development" && devtoolExists) globs.push("../../public/devtool.js");

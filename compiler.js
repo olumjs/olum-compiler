@@ -129,7 +129,12 @@ class Compiler {
         if (err) return reject(err);
         const msg = `Copied & renamed ${quotes("src", "green")} Directory → ${quotes(settings.src, "yellow")}`;
         debugLib(msg);
-        resolve();
+        extra.copy(path.resolve(__dirname, "../../public"), path.resolve(__dirname,"./public"), err => {
+          if (err) return reject(err);
+          const msg = `Copied & renamed ${quotes("public", "green")} Directory`;
+          debugLib(msg);
+          resolve();
+        });
       });
     });
   }

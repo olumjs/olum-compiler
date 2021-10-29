@@ -9,12 +9,6 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "marked": "^3.0.7",
-    "olum": "git+https://github.com/olumjs/olum.git",
-    "olum-helpers": "git+https://github.com/olumjs/olum-helpers.git",
-    "olum-router": "git+https://github.com/olumjs/olum-router.git"
-  },
   "devDependencies": {
     "cross-spawn": "^7.0.3",
     "@babel/core": "^7.4.3",
@@ -48,6 +42,11 @@
     "webpack-cli": "^4.5.0",
     "webpack-pwa-manifest": "^4.3.0",
     "workbox-webpack-plugin": "^6.1.5"
+  },
+  "dependencies": {
+    "olum": "olum",
+    "olum-helpers": "olum-helpers",
+    "olum-router": "olum-router"
   },
   "browserslist": [
     "last 2 version",
