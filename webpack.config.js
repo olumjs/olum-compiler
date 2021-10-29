@@ -6,14 +6,14 @@ const TerserPlugin = require("terser-webpack-plugin");
 const WorkboxPlugin = require("workbox-webpack-plugin");
 const WebpackPwaManifest = require("webpack-pwa-manifest");
 const CopyPlugin = require("copy-webpack-plugin");
-const { title, dest, favicon, template, src, hash, comments, polyfill, assetAsModule, serviceWorker, manifest } = require("../../package.json").olum;
+const { title, favicon, template, hash, comments, polyfill, assetAsModule, serviceWorker, manifest } = require("../../package.json").olum;
 
 module.exports = env => {
   const mode = !!env.dev ? "development" : "production";
-  const globs = [`./${src}/app.scss`, `./${src}/app.js`];
+  const globs = [`./src/app.scss`, `./src/app.js`];
   // add devtool if it exists
-  const devtoolExists = fs.existsSync(path.resolve(__dirname, "../../public/devtool.js"));
-  if (mode === "development" && devtoolExists) globs.push("../../public/devtool.js");
+  const devtoolExists = fs.existsSync(path.resolve(__dirname, "./public/devtool.js"));
+  if (mode === "development" && devtoolExists) globs.push("./public/devtool.js");
   const main = polyfill ? ["babel-polyfill", ...globs] : [...globs];
 
   const config = {
@@ -21,7 +21,7 @@ module.exports = env => {
     mode,
     entry: { main },
     output: {
-      path: path.resolve(__dirname, dest),
+      path: path.resolve(__dirname, "build"),
       filename: hash ? `app[fullhash:${hash}].js` : `app[fullhash:5].js`,
     },
     plugins: [new HtmlWebpackPlugin({ title, template, favicon })],
@@ -50,11 +50,11 @@ module.exports = env => {
     };
     config.module.rules.push(obj);
   } else {
-    config.plugins.push(new CopyPlugin({ patterns: [{ from: "../../src/assets", to: path.resolve(__dirname, `${dest}/assets`) }] }));
+    config.plugins.push(new CopyPlugin({ patterns: [{ from: "./src/assets", to: path.resolve(__dirname, `build/assets`) }] }));
   }
 
   if (mode === "development") {
-    const clean = new CleanWebpackPlugin({ cleanAfterEveryBuildPatterns: [`./${dest}/**/*`] });
+    const clean = new CleanWebpackPlugin({ cleanAfterEveryBuildPatterns: [`./build/**/*`] });
     config.plugins.unshift(clean);
     config.devtool = "eval-source-map";
   }

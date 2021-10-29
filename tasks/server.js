@@ -8,11 +8,11 @@ const server = () => {
     try {
       logger(taskName, "start");
       const options = {
-        root: `./${settings.dest}`,
+        root: "build",
         port: process.env.PORT || settings.port,
         livereload: settings.livereload,
         https: settings.https,
-        fallback: `./${settings.dest + settings.fallback}`,
+        fallback: "build"+settings.fallback,
       };
       connect.server(options);
       resolve();
