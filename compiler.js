@@ -20,7 +20,7 @@ const colors = require("colors");
 const settings = require("../../package.json").olum;
 
 // helpers
-const isDebugging = false;
+const isDebugging = true;
 const debugLib = arg => (isDebugging ? console.log(arg) : "");
 const quotes = (msg, color = "grey") => `'${colors[color].bold(msg)}'`;
 const log = (type, path, err) => quotes(`${type} : ${path.replace(settings.src, "src")}`, "white") + "\n" + colors.red.bold(err);
@@ -60,7 +60,7 @@ class Compiler {
     cmd.parse(process.argv);
   }
 
-  getPaths(base = "src") {
+  getPaths(base = "../../src") {
     return new Promise((resolve, reject) => {
       const dirs = src => fs.readdirSync(src).map(item => path.join(src, item)).filter(item => fs.statSync(item).isDirectory());
       const recursive = src => [src, ...flatten(dirs(src).map(recursive))];
@@ -84,9 +84,10 @@ class Compiler {
           files.forEach((file, ind) => {
             const lastFile = files[files.length - 1];
             const item = path.join(dir, file);
-            if (!fs.statSync(item).isDirectory()) this.paths.push(item.trim().replace(/^src/, settings.src)); // push files only and exclude directories
+            if (!fs.statSync(item).isDirectory()) this.paths.push(item.trim().replace(/src/, "node_modules/olum-compiler/"+settings.src)); // push files only and exclude directories
             if (directories.indexOf(lastDir) === index && files.indexOf(lastFile) === ind) {
               const msg = `Created ${quotes("Paths", "blue")} Tree.`;
+              debugLib(["Final paths",this.paths]);
               debugLib(msg);
               resolve();
             }
@@ -124,7 +125,7 @@ class Compiler {
 
   copy() {
     return new Promise((resolve, reject) => {
-      extra.copy(path.resolve(__dirname, "src"), path.resolve(__dirname, settings.src), err => {
+      extra.copy(path.resolve(__dirname, "../../src"), path.resolve(__dirname, settings.src), err => {
         if (err) return reject(err);
         const msg = `Copied & renamed ${quotes("src", "green")} Directory → ${quotes(settings.src, "yellow")}`;
         debugLib(msg);
@@ -134,7 +135,7 @@ class Compiler {
   }
 
   sharedStyle() {
-    const file = path.resolve(__dirname, "src/styles/shared.scss");
+    const file = path.resolve(__dirname, "../../src/styles/shared.scss");
     return new Promise((resolve, reject) => {
       if (fs.existsSync(file)) {
         fs.readFile(file, "utf8", (err, data) => {
@@ -150,7 +151,7 @@ class Compiler {
   }
 
   compiledSharedStyle(shared) {
-    const file = path.resolve(__dirname, "src/styles/shared.scss");
+    const file = path.resolve(__dirname, "../../src/styles/shared.scss");
     return new Promise((resolve, reject) => {
       try {
         // compile sass to css 
@@ -423,7 +424,7 @@ class Compiler {
     debugLib(`Compiling in ${quotes(this.mode, "green")} mode...`);
 
     try {
-      await this.getPaths("src");
+      await this.getPaths(path.resolve(__dirname,"../../src"));
       await this.clean("src"); // clean src folder which is ".pre-build"
       await this.copy();
       const shared = await this.sharedStyle();

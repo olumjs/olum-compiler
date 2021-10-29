@@ -9,7 +9,7 @@ const bundle = mode => {
     const file = path.resolve(__dirname, "../node_modules/webpack/bin/webpack.js");
     logger(taskName, "start");
     if (mode === "development") {
-      exec(`${file} --env dev`, (error, stdout, stderr) => {
+      exec(`webpack --env dev`, (error, stdout, stderr) => {
         if (error) return reject(error);
         if (stderr.trim() !== "") return reject(stderr);
         if (stdout !== "webpack compiled successfully\n") console.log(stdout);

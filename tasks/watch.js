@@ -3,8 +3,10 @@ const compile = require("./compile");
 const bundle = require("./bundle");
 const colors = require("colors");
 const logger = require("./logger");
+const path = require("path");
 
-const watcher = gulp.watch(["./src/**/*"]);
+const src = path.resolve(__dirname, "../../../src/**/*");
+const watcher = gulp.watch([src]);
 const taskName = "watch";
 const watchSequence = [];
 

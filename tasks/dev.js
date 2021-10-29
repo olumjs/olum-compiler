@@ -6,10 +6,10 @@ const colors = require("colors");
 
 async function renderDev() {
   try {
-    await compile("development");
+    // await compile("development");
     await bundle("development");
-    await watch();
-    await server();
+    // await watch();
+    // await server();
   } catch (err) {
     console.log(colors.red.bold(err));
   }
