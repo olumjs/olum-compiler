@@ -20,23 +20,23 @@ const getIcon = () => {
 const linux = (obj, resolve, reject) => {  
   if (obj.package == "deb") {
     // hint 
-    console.log(`\nYou need to download ${colors.yellow("NWjs")} from ${colors.green(obj.link)}\nand paste it here ${colors.green("file://"+path.resolve(__dirname, "../nwjs"))}\n`);
-    const nwjsDir = path.resolve(__dirname, `../nwjs`);
+    console.log(`\nYou need to download ${colors.yellow("NWjs")} from ${colors.green(obj.link)}\nand paste it here ${colors.green("file://"+path.resolve(__dirname, "../../../nwjs"))}\n`);
+    const nwjsDir = path.resolve(__dirname, "../../../nwjs");
     if (!fs.existsSync(nwjsDir)) fs.mkdirSync(nwjsDir);
 
     // ask about nwjs
     inquirer.prompt([q1]).then(ans => {
       if (ans.nwjs) {
-        const mainDir = path.resolve(__dirname,"../desktop");
+        const mainDir = path.resolve(__dirname,"../../../desktop");
         const anatomy = {
           dirs: [
-            path.resolve(__dirname, `../desktop/${packageJSON.name}/DEBIAN`),
-            path.resolve(__dirname, `../desktop/${packageJSON.name}/usr/share/applications`),
-            path.resolve(__dirname, `../desktop/${packageJSON.name}/opt/${packageJSON.name}`),
+            path.resolve(__dirname, `../../../desktop/${packageJSON.name}/DEBIAN`),
+            path.resolve(__dirname, `../../../desktop/${packageJSON.name}/usr/share/applications`),
+            path.resolve(__dirname, `../../../desktop/${packageJSON.name}/opt/${packageJSON.name}`),
           ],
           files: [
             {
-              path: path.resolve(__dirname, `../desktop/${packageJSON.name}/DEBIAN/control`),
+              path: path.resolve(__dirname, `../../../desktop/${packageJSON.name}/DEBIAN/control`),
               content: 
 `Package: ${packageJSON.name}
 Version: ${packageJSON.version}
@@ -51,7 +51,7 @@ Depends:\n\n
 `
             },
             {
-              path: path.resolve(__dirname, `../desktop/${packageJSON.name}/DEBIAN/postinst`),
+              path: path.resolve(__dirname, `../../../desktop/${packageJSON.name}/DEBIAN/postinst`),
               content: 
 `#!/bin/bash
 
@@ -73,7 +73,7 @@ cd /opt/${packageJSON.name} && chmod 775 *
 `
             },
             {
-              path: path.resolve(__dirname, `../desktop/${packageJSON.name}/DEBIAN/preinst`),
+              path: path.resolve(__dirname, `../../../desktop/${packageJSON.name}/DEBIAN/preinst`),
               content: 
 `#!/bin/bash
 
@@ -117,7 +117,7 @@ done
 `
             },
             {
-              path: path.resolve(__dirname, `../desktop/${packageJSON.name}/usr/share/applications/${packageJSON.name}.desktop`),
+              path: path.resolve(__dirname, `../../../desktop/${packageJSON.name}/usr/share/applications/${packageJSON.name}.desktop`),
               content: 
 `[Desktop Entry]
 Encoding=UTF-8
@@ -127,7 +127,7 @@ GenericName=${packageJSON.name}
 Comment=${packageJSON.description}
 Exec=/opt/${packageJSON.name}/nw
 TryExec=/opt/${packageJSON.name}/nw
-Icon=/opt/${packageJSON.name}/${settings.dest}/${getIcon()}
+Icon=/opt/${packageJSON.name}/build/${getIcon()}
 Categories=Utility;
 Type=Application
 Terminal=false
@@ -135,16 +135,16 @@ Keywords=web;software;
 `
             },
             {
-              path: path.resolve(__dirname, `../desktop/${packageJSON.name}/opt/${packageJSON.name}/package.json`),
+              path: path.resolve(__dirname, `../../../desktop/${packageJSON.name}/opt/${packageJSON.name}/package.json`),
               content: JSON.stringify({
                 name: packageJSON.name,
                 version: packageJSON.version,
                 description: packageJSON.description,
-                main: settings.dest + "/index.html",
+                main: "build/index.html",
                 window: {
                   toolbar: true,
                   title: packageJSON.name,
-                  icon: settings.dest + "/" + getIcon(),
+                  icon: "build/" + getIcon(),
                   width: 768,
                   height: 728,
                   min_width: 600,
@@ -181,35 +181,35 @@ Keywords=web;software;
         });
     
         // copy build folder 
-        const buildSrc = path.resolve(__dirname, `../${settings.dest}`);
-        const buildDest = path.resolve(__dirname, `../desktop/${packageJSON.name}/opt/${packageJSON.name}/${settings.dest}`);
+        const buildSrc = path.resolve(__dirname, `../build`);
+        const buildDest = path.resolve(__dirname, `../../../desktop/${packageJSON.name}/opt/${packageJSON.name}/build`);
         extra.copy(buildSrc, buildDest, err => {
           if (err) {
             console.error(colors.red(err));
             return reject();
           }
-          console.log(colors.yellow(`\nCloning ${settings.dest} directory...`));
+          console.log(colors.yellow(`\nCloning build directory...`));
     
           // Extracting
-          const nwjsSrc = path.resolve(__dirname, "../nwjs/" + obj.file);
-          const nwjsDest = path.resolve(__dirname, `../desktop/${packageJSON.name}/opt/${packageJSON.name}`);
+          const nwjsSrc = path.resolve(__dirname, "../../../nwjs/" + obj.file);
+          const nwjsDest = path.resolve(__dirname, `../../../desktop/${packageJSON.name}/opt/${packageJSON.name}`);
           if (!fs.existsSync(nwjsSrc)) {
             console.error(colors.red("\nCouldn't find " + obj.file));
             return reject();
           }
 
           console.log(colors.yellow(`Extracting ${obj.file}...`));
-          decompress(nwjsSrc, path.resolve(__dirname, "../nwjs")).then(files => {
+          decompress(nwjsSrc, path.resolve(__dirname, "../../../nwjs")).then(files => {
             // Cloning nwjs
             console.log(colors.yellow(`Cloning ${obj.file}...`));
-            extra.copy(path.resolve(__dirname, `../nwjs/${obj.dir}/`), nwjsDest, err => {
+            extra.copy(path.resolve(__dirname, `../../../nwjs/${obj.dir}/`), nwjsDest, err => {
               if (err) {
                 console.error(colors.red(err));
                 return reject();
               }
               
               // packaging
-              const debPath = path.resolve(__dirname, `../desktop/${packageJSON.name}/DEBIAN`);
+              const debPath = path.resolve(__dirname, `../../../desktop/${packageJSON.name}/DEBIAN`);
               const chmod = "chmod 755 *";
               const dpkg = `dpkg-deb --build ${packageJSON.name}`;
               const dpkgCheck = "whereis dpkg-deb";
@@ -230,7 +230,7 @@ Keywords=web;software;
                       return reject();
                     }
 
-                    console.log(colors.cyan(`Get your debian package from file://${path.resolve(__dirname, `../desktop`)}`));
+                    console.log(colors.cyan(`Get your debian package from file://${path.resolve(__dirname, `../../../desktop`)}`));
                     resolve();
                   });
                 }

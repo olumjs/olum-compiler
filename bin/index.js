@@ -2,12 +2,19 @@
 
 "use strict";
 
-// todo check node version 1st
-
 const process = require("process");
 process.on("unhandledRejection", err => {
   throw new Error(err)
 });
+
+// check node version
+const requiredNodeMajorVer = +require("../package.json").engines.node.replace(/\<|\>|\=/gi,"").split(".")[0];
+const currentNodeMajorVer = +process.version.replace(/v/gi, "").split(".")[0];
+if (currentNodeMajorVer < requiredNodeMajorVer) {
+  console.error(`\nYour node version is "${currentNodeMajorVer}" which is not compatible with 'olum-compiler', Please upgrade to "${requiredNodeMajorVer}"\n`);
+  process.exit(1);
+}
+
 const path = require("path");
 const spawn = require("cross-spawn");
 const script = process.argv[2];

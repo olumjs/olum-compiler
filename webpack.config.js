@@ -10,10 +10,10 @@ const { title, favicon, template, hash, comments, polyfill, assetAsModule, servi
 
 module.exports = env => {
   const mode = !!env.dev ? "development" : "production";
-  const globs = [`./src/app.scss`, `./src/app.js`];
+  const globs = [path.resolve(__dirname, "./src/app.scss"), path.resolve(__dirname, "./src/app.js")];
   // add devtool if it exists
-  const devtoolExists = fs.existsSync(path.resolve(__dirname, "./public/devtool.js"));
-  if (mode === "development" && devtoolExists) globs.push("./public/devtool.js");
+  const devtoolExists = fs.existsSync(path.resolve(__dirname, "./devtool.js"));
+  if (mode === "development" && devtoolExists) globs.push(path.resolve(__dirname, "./devtool.js"));
   const main = polyfill ? ["babel-polyfill", ...globs] : [...globs];
 
   const config = {

@@ -16,7 +16,7 @@ const compile = mode => {
         logger(taskName, "end");
       });
     } else if (mode === "production") {
-      exec(`node ${file} compile dev`, (error, stdout, stderr) => {
+      exec(`node ${file} compile`, (error, stdout, stderr) => {
         if (error) return reject(error);
         if (stderr.trim() !== "") return reject(stderr);
         if (stdout.trim() !== "") console.log(stdout);

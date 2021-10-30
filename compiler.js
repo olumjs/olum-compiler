@@ -17,7 +17,6 @@ const fs = require("fs");
 const extra = require("fs-extra");
 const path = require("path");
 const colors = require("colors");
-const settings = require("../../package.json").olum;
 
 // helpers
 const isDebugging = true;
@@ -35,6 +34,7 @@ const mkRegex = arr => {
 };
 
 class Compiler {
+  // todo compile .html files only instead of files inside components/views
   viewsDirs = ["components", "views"];
   regex = {
     template: {
@@ -129,12 +129,27 @@ class Compiler {
         if (err) return reject(err);
         const msg = `Copied & renamed ${quotes("src", "green")} Directory → ${quotes("src", "yellow")}`;
         debugLib(msg);
-        extra.copy(path.resolve(__dirname, "../../public"), path.resolve(__dirname,"./public"), err => {
-          if (err) return reject(err);
-          const msg = `Copied & renamed ${quotes("public", "green")} Directory`;
-          debugLib(msg);
-          resolve();
-        });
+        // delete public folder if it exists
+        if (fs.existsSync(path.resolve(__dirname,"./public"))) {
+          extra.remove(path.resolve(__dirname,"./public"), err => {
+            if (err) return reject(err);
+            // copy public from root to node_module/olum-compiler
+            extra.copy(path.resolve(__dirname, "../../public"), path.resolve(__dirname,"./public"), err => {
+              if (err) return reject(err);
+              const msg = `Copied & renamed ${quotes("public", "green")} Directory`;
+              debugLib(msg);
+              resolve();
+            });
+          });
+        } else {
+          // copy public from root to node_module/olum-compiler
+          extra.copy(path.resolve(__dirname, "../../public"), path.resolve(__dirname,"./public"), err => {
+            if (err) return reject(err);
+            const msg = `Copied & renamed ${quotes("public", "green")} Directory`;
+            debugLib(msg);
+            resolve();
+          });
+        }
       });
     });
   }

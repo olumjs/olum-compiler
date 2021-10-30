@@ -8,7 +8,7 @@ const clean = dir => {
   return new Promise((resolve, reject) => {
     logger(taskName, "start");
     exec(`node ${file} clean ${dir}`, (error, stdout, stderr) => {
-      if (error) return reject();
+      if (error) return reject(error);
       resolve();
       logger(taskName, "end");
     });
