@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * @name Compiler.js
- * @version 0.0.7
+ * @name olum-compiler
+ * @version 0.1.1
  * @copyright 2021
  * @author Eissa Saber
  * @license MIT
@@ -19,7 +19,7 @@ const path = require("path");
 const colors = require("colors");
 
 // helpers
-const isDebugging = true;
+const isDebugging = false;
 const debugLib = arg => (isDebugging ? console.log(arg) : "");
 const quotes = (msg, color = "grey") => `'${colors[color].bold(msg)}'`;
 const log = (type, path, err) => quotes(`${type} : ${path.replace("src", "src")}`, "white") + "\n" + colors.red.bold(err);

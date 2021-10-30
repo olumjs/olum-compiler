@@ -1,3 +1,11 @@
+/**
+ * @name olum-compiler
+ * @version 0.1.1
+ * @copyright 2021
+ * @author Eissa Saber
+ * @license MIT
+ */
+
 const path = require("path");
 const fs = require("fs");
 const { CleanWebpackPlugin } = require("clean-webpack-plugin");
