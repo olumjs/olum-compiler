@@ -6,6 +6,9 @@
   "bin": {
     "olum-compiler": "bin/index.js"
   },
+  "scripts": {
+    "postinstall": "echo thanks for downloading Olum-Compiler"
+  },
   "author": "Eissa Saber",
   "license": "MIT",
   "repository": {
