@@ -22,7 +22,7 @@ const colors = require("colors");
 const isDebugging = false;
 const debugLib = arg => (isDebugging ? console.log(arg) : "");
 const quotes = (msg, color = "grey") => `'${colors[color].bold(msg)}'`;
-const log = (type, path, err) => quotes(`${type} : ${path.replace("src", "src")}`, "white") + "\n" + colors.red.bold(err);
+const log = (type, path, err) => quotes(`${type} : ${path.replace(/[\/|\\]node_modules[\/|\\]olum-compiler/g,"")}`, "white") + "\n" + colors.red.bold(err);
 const isObj = obj => !!(obj !== null && typeof obj === "object");
 const isFullArr = arr => !!(isObj(arr) && Array.isArray(arr) && arr.length);
 const isDef = val => !!(val !== undefined && val !== null);
@@ -45,7 +45,7 @@ class Compiler {
     script: {
       all: /<script[\s\S]*?>[\s\S]*?<\/script>/gi,
       tag: /<script[\s\S]*?>|<\/script>/gi,
-      classStartPoint: /(class.*)(\{)/,
+      classStartPoint: /(class .*)(\{)/,
     },
     style: {
       all: /<style[\s\S]*?>[\s\S]*?<\/style>/gi,

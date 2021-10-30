@@ -9,17 +9,19 @@ const compile = mode => {
     logger(taskName, "start");
     if (mode === "development") {
       exec(`node ${file} compile dev`, (error, stdout, stderr) => {
+        if (stdout.toLowerCase().includes("error")) console.log(colors.red.bold(stdout));
+        else if (stdout.trim() !== "") console.log(stdout);
         if (error) return reject(error);
-        if (stderr.trim() !== "") return reject(stderr);
-        if (stdout.trim() !== "") console.log(stdout);
+        if (stderr) return reject(stderr);
         resolve();
         logger(taskName, "end");
       });
     } else if (mode === "production") {
       exec(`node ${file} compile`, (error, stdout, stderr) => {
+        if (stdout.toLowerCase().includes("error")) console.log(colors.red.bold(stdout));
+        else if (stdout.trim() !== "") console.log(stdout);
         if (error) return reject(error);
-        if (stderr.trim() !== "") return reject(stderr);
-        if (stdout.trim() !== "") console.log(stdout);
+        if (stderr) return reject(stderr);
         resolve();
         logger(taskName, "end");
       });
