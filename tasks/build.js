@@ -15,7 +15,7 @@ async function renderBuild() {
     await catchall(); // catch all routes to fallback to root
     await copyBuild(); // copy build folder to project root after finishing builing for production
     await desktop(); // package desktop app
-    process.exitCode = 1;
+    // process.exitCode = 1;
   } catch (err) {
     console.log(colors.red.bold(err));
   }
