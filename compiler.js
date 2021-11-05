@@ -40,6 +40,7 @@ class Compiler {
       all: /<template[\s\S]*?>[\s\S]*?<\/template>/gi,
       tag: /<template[\s\S]*?>|<\/template>/gi,
       component: /(?<=<)[A-Z]([^/>]+)(?=\/>)/g, // detect <App/> or <App-Nav/>
+      comment: /\<\!\-\-(.|\s)*?\-\-\>/gi
     },
     script: {
       all: /<script[\s\S]*?>[\s\S]*?<\/script>/gi,
@@ -338,7 +339,8 @@ class Compiler {
     // start auto inject data method
     const imports = this.getImportStatement(js); // get all import statements
     const modulesNames = imports.map(statement => this.getModuleName(statement)); // extract modules names 
-    const components = html.match(this.regex.template.component) || []; // get components tags
+    const cleanHTML = html.replace(this.regex.template.comment, ""); // clean html from comments
+    const components = cleanHTML.match(this.regex.template.component) || []; // get components tags
     const componentsNames = components.map(name => name.replace(/(.*)(\-)/, "").trim()); // remove prefix
     const className = this.getClassName(js);
 
