@@ -21,7 +21,7 @@ const colors = require("colors");
 const isDebugging = false;
 const debugLib = arg => (isDebugging ? console.log(arg) : "");
 const quotes = (msg, color = "grey") => `'${colors[color].bold(msg)}'`;
-const log = (type, path, err) => quotes(`${type} : ${path.replace(/[\/|\\]node_modules[\/|\\]olum-compiler/g,"")}`, "white") + "\n" + colors.red.bold(err);
+const log = (type, path, err) => quotes(`\n${type} : ${path.replace(/[\/|\\]node_modules[\/|\\]olum-compiler/g,"")}`, "white") + "\n" + colors.red.bold(err);
 const isObj = obj => !!(obj !== null && typeof obj === "object");
 const isFullArr = arr => !!(isObj(arr) && Array.isArray(arr) && arr.length);
 const isDef = val => !!(val !== undefined && val !== null);
@@ -51,6 +51,7 @@ class Compiler {
       all: /<style[\s\S]*?>[\s\S]*?<\/style>/gi,
       tag: /<style[\s\S]*?>|<\/style>/gi,
       openTag: /<style[\s\S]*?>/gi,
+      comment: /(\/\*)([\s\S]*?)(\*\/)|(\/\/.*)/gi
     },
   };
 
@@ -218,74 +219,78 @@ class Compiler {
     return string;
   }
   
-  scssImporter(file,scss) {
-          // extend css to outside component file - initial test
-          const importRegex =  /(\/*|\/\/)=?.*(@import)\s+((\'|\").*(\'|\"));?/gi;
+  styleImporter(file, scss) {
+    return new Promise ((resolve, reject) => {
+      // extend css to outside component file - initial test
+      const importRegex =  /(\/*|\/\/)=?.*(@import)\s+((\'|\").*(\'|\"));?/gi;
+      const imports = scss.match(importRegex);
+      debugLib("Style Import statements\n", imports);
       
-          if (file.includes("home")) {
-            const imports = scss.match(importRegex);
-            console.log({imports});
+      if (isFullArr(imports)) {
+        imports.map(imp => {
+          if (!imp.trim().startsWith("/")) { // detect non-commented @import
+            const scssPath = imp.replace(/\@import|\s|'|"|;/g, "").trim();
+            const scssFullPath = file.replace(path.basename(file), "") + scssPath;
+            debugLib("Style paths\n", {imp, scssPath, scssFullPath});
             
-            if (isFullArr(imports)) {
-              const paths = imports.map(imp => {
-                if (!imp.trim().startsWith("/")) {
-                  scss = scss.replace(imp, ""); // clean component style from unsupported @import
-                  return imp.replace(/\@import|\s|'|"|;/g, "").trim();
-                }
-              }).filter(item=>item !== undefined);
-              console.log({paths});
-              
-              const scssFullPath  = paths.map(_path=>{
-                let _file = file.replace("src", "src");
-                const fileName = path.basename(_file);
-                return _file.replace(fileName, "") + _path;
+            if (fs.existsSync(scssFullPath)) {
+              fs.readFile(scssFullPath, "utf8", (err, data) => {
+                if (err) return reject(err);
+                debugLib("Style module content\n", data);
+                
+                scss = scss.replace(imp, data); // substitute with import statement content
+                return resolve(scss);
               });
               
-              fs.readFile(scssFullPath[0], "utf8", (err, data) => {
-                if (err) return console.error(colors.red.bold(err));
-                console.log({data});
-              });
-              console.log({scssFullPath});
-              
+            } else {
+              return reject("Style file doesn't exist in this path '" + scssPath + "'");
             }
-            
           }
-    
+        });
+      } else {
+        return resolve(scss);
+      }
+
+    });
   }
   
   css(file, data, shared, compiledShared) {
     return new Promise((resolve, reject) => {
       const styleArr = data.match(this.regex.style.all);
       const style = isFullArr(styleArr) ? styleArr[styleArr.length - 1] : ""; // get last style tag as the order of component file | because you may have style tag inside the class "script tag"
-      let scss = style.replace(this.regex.style.tag, "");
-      scss = this.stringify(scss, file);
-
-      // this.scssImporter(file,scss); // test
+      let scss = style.replace(this.regex.style.tag, ""); // remove style tag
+      scss = scss.replace(this.regex.style.comment, ""); // remove block/inline comments
       
-      try {
-        // compile sass to css 
-        const css = this.hasSASS(style) ? sass.renderSync({
-          data: shared + scss
-        }).css.toString() : compiledShared + scss;
-
-        if (this.mode === "development") { // development
-          const parsedDev = this.parse(css, file);
-          resolve("\n style() { \n return `" + parsedDev + "`;\n}\n");
-
-        } else if (this.mode === "production") { // production
-          // prefix & minify css
-          postcss([autoprefixer, cssnano]).process(css, {
-            from: undefined
-          }).then(result => {
-            result.warnings().forEach(warn => console.warn(colors.yellow.bold(warn.toString())));
-            const parsedBuild = this.parse(result.css, file);
-            resolve("\n style() { \n return `" + parsedBuild + "`;\n}\n");
-          }).catch(err => reject(log("PostCSS - [autoprefixer, cssnano]", file, err.reason + "\n" + err.showSourceCode())));
+      this.styleImporter(file, scss).then(_scss => {
+        _scss = this.stringify(_scss, file);
+        
+        try {
+          // compile sass to css 
+          const css = this.hasSASS(style) ? sass.renderSync({
+            data: shared + _scss
+          }).css.toString() : compiledShared + _scss;
+  
+          if (this.mode === "development") { // development
+            const parsedDev = this.parse(css, file);
+            resolve("\n style() { \n return `" + parsedDev + "`;\n}\n");
+  
+          } else if (this.mode === "production") { // production
+            // prefix & minify css
+            postcss([autoprefixer, cssnano]).process(css, {
+              from: undefined
+            }).then(result => {
+              result.warnings().forEach(warn => console.warn(colors.yellow.bold(warn.toString())));
+              const parsedBuild = this.parse(result.css, file);
+              resolve("\n style() { \n return `" + parsedBuild + "`;\n}\n");
+            }).catch(err => reject(log("PostCSS - [autoprefixer, cssnano]", file, err.reason + "\n" + err.showSourceCode())));
+          }
+  
+        } catch (err) { // error related to Sass
+          reject(log("Sass Compiler", file, err));
         }
 
-      } catch (err) { // error related to Sass
-        reject(log("Sass Compiler", file, err));
-      }
+      }).catch(err => reject(log("Style Importer", file, err)));
+      
     });
   }
 
@@ -294,7 +299,8 @@ class Compiler {
       const tempArr = data.match(this.regex.template.all);
       const template = isFullArr(tempArr) ? tempArr[0] : ""; // get 1st template tag as the order of component file
       const markup = template.replace(this.regex.template.tag, "");
-      const html = "\n template() { \n return `" + markup + "`;\n}\n";
+      const cleanHTML = markup.replace(this.regex.template.comment, ""); // clean html from comments
+      const html = "\n template() { \n return `" + cleanHTML + "`;\n}\n";
       resolve(html);
     });
   }
