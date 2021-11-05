@@ -33,8 +33,6 @@ const mkRegex = arr => {
 };
 
 class Compiler {
-  // todo compile .html files only instead of files inside components/views
-  viewsDirs = ["components", "views"];
   regex = {
     template: {
       all: /<template[\s\S]*?>[\s\S]*?<\/template>/gi,
@@ -60,32 +58,34 @@ class Compiler {
     cmd.command("compile [mode]").action(this.init.bind(this));
     cmd.parse(process.argv);
   }
+  
+  isHTML(path) {
+    const arr = path.split(".");
+    const lastItem = arr[arr.length-1]; 
+    if (lastItem.trim().toLowerCase() === "html") return true;
+    return false;
+  }
 
   getPaths(base = "../../src") {
     return new Promise((resolve, reject) => {
       const dirs = src => fs.readdirSync(src).map(item => path.join(src, item)).filter(item => fs.statSync(item).isDirectory());
       const recursive = src => [src, ...flatten(dirs(src).map(recursive))];
-      const arr = recursive(base);
-
-      // get all dirs 
-      const directories = [...arr].filter(item => {
-        const regex = mkRegex(this.viewsDirs);
-        const result = regex.test(item);
-        if (result) return item;
-      });
+      const directories = recursive(base);
+      debugLib(["all directories", directories]);
+      
       if (!isFullArr(directories)) return reject("No directories found !");
       const lastDir = directories[directories.length - 1];
-
-      // get all files 
+      
+      // get all html files 
       this.paths = [];
-      directories.forEach((dir, index) => {
+      [...directories].forEach((dir, index) => {
         fs.readdir(path.resolve(dir), (err, files) => {
           if (err) return reject(err);
-
+          
           files.forEach((file, ind) => {
             const lastFile = files[files.length - 1];
             const item = path.join(dir, file);
-            if (!fs.statSync(item).isDirectory()) this.paths.push(item.trim().replace(/src/, "node_modules/olum-compiler/"+"src")); // push files only and exclude directories
+            if (!fs.statSync(item).isDirectory() && this.isHTML(item)) this.paths.push(item.trim().replace(/src/, "node_modules/olum-compiler/"+"src")); // push files only and exclude directories
             if (directories.indexOf(lastDir) === index && files.indexOf(lastFile) === ind) {
               const msg = `Created ${quotes("Paths", "blue")} Tree.`;
               debugLib(["Final paths",this.paths]);
@@ -93,10 +93,9 @@ class Compiler {
               resolve();
             }
           });
-
         });
-      });
-
+      })
+      
     });
   }
 
@@ -224,19 +223,19 @@ class Compiler {
       // extend css to outside component file - initial test
       const importRegex =  /(\/*|\/\/)=?.*(@import)\s+((\'|\").*(\'|\"));?/gi;
       const imports = scss.match(importRegex);
-      debugLib("Style Import statements\n", imports);
+      debugLib(["Style Import statements\n", imports]);
       
       if (isFullArr(imports)) {
         imports.map(imp => {
           if (!imp.trim().startsWith("/")) { // detect non-commented @import
             const scssPath = imp.replace(/\@import|\s|'|"|;/g, "").trim();
             const scssFullPath = file.replace(path.basename(file), "") + scssPath;
-            debugLib("Style paths\n", {imp, scssPath, scssFullPath});
+            debugLib(["Style paths\n", {imp, scssPath, scssFullPath}]);
             
             if (fs.existsSync(scssFullPath)) {
               fs.readFile(scssFullPath, "utf8", (err, data) => {
                 if (err) return reject(err);
-                debugLib("Style module content\n", data);
+                debugLib(["Style module content\n", data]);
                 
                 scss = scss.replace(imp, data); // substitute with import statement content
                 return resolve(scss);
