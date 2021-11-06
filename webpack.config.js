@@ -16,8 +16,10 @@ const CopyPlugin = require("copy-webpack-plugin");
 const { title, favicon, template, hash, comments, polyfill, assetAsModule, serviceWorker, manifest } = require("../../package.json").olum;
 
 module.exports = env => {
+  if (!fs.existsSync(path.resolve(__dirname, "./src/index.js"))) console.log("Make sure to have index.js & index.scss in src directory instead of app.js & app.scss");
+  
   const mode = !!env.dev ? "development" : "production";
-  const globs = [path.resolve(__dirname, "./src/app.scss"), path.resolve(__dirname, "./src/app.js")];
+  const globs = [path.resolve(__dirname, "./src/index.scss"), path.resolve(__dirname, "./src/index.js")];
   // add devtool if it exists
   const devtoolExists = fs.existsSync(path.resolve(__dirname, "./devtool.js"));
   if (mode === "development" && devtoolExists) globs.push(path.resolve(__dirname, "./devtool.js"));
