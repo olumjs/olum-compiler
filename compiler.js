@@ -308,7 +308,19 @@ class Compiler {
     return new Promise((resolve, reject) => {
       const scriptArr = data.match(this.regex.script.all);
       const script = isFullArr(scriptArr) ? scriptArr[0] : ""; // get 1st script tag as the order of component file
-      const js = script.replace(this.regex.script.tag, "");
+      let js = script.replace(this.regex.script.tag, "");
+      
+      // start replace .html extension from import statements with .js
+      const imports = this.getImportStatement(js); // get all import statements
+      const htmlExtRegex = /\.html/gi;
+      imports.forEach(imp => {
+        if (htmlExtRegex.test(imp)) {
+          debugLib({imp})
+          js = js.replace(htmlExtRegex, ".js");
+        }
+      });
+      // end replace .html extension from import statements with .js
+      
       const hasJsClass = this.regex.script.classStartPoint.test(js);
       if (hasJsClass) resolve(js);
       else reject(log("JS Class", file, "Couldn't find a class"));

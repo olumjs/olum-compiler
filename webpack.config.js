@@ -7,6 +7,7 @@
 
 const path = require("path");
 const fs = require("fs");
+const webpack = require("webpack");
 const { CleanWebpackPlugin } = require("clean-webpack-plugin");
 const HtmlWebpackPlugin = require("html-webpack-plugin");
 const TerserPlugin = require("terser-webpack-plugin");
@@ -33,7 +34,16 @@ module.exports = env => {
       path: path.resolve(__dirname, "build"),
       filename: hash ? `app[fullhash:${hash}].js` : `app[fullhash:5].js`,
     },
-    plugins: [new HtmlWebpackPlugin({ title, template, favicon })],
+    plugins: [
+      new HtmlWebpackPlugin({ title, template, favicon }),
+      new webpack.NormalModuleReplacementPlugin(/.*/g, resource => {
+        const contextRegex = /[\/|\\]node_modules[\/|\\]olum-compiler[\/|\\]src/g;
+        // if import statement within the file inside src folder has .html extension then replace it with .js
+        if (contextRegex.test(resource.context) && resource.request.toLowerCase().endsWith(".html")) {
+          resource.request = resource.request.substr(0, resource.request.length - 5) + ".js";
+        }
+      })
+    ],
     module: {
       rules: [
         {
