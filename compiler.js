@@ -367,7 +367,7 @@ class Compiler {
       const finalNames = [];
       modulesNames.forEach(moduleName => componentsNames.forEach(compName => (moduleName !== "" && moduleName === compName) ? finalNames.push(moduleName) : null));
       dataMethod = `
-        data() {
+        olumCompData() {
           return {
             name: "${className}",
             components: { ${finalNames.join(", ")} },
@@ -380,7 +380,7 @@ class Compiler {
     } else { // NO components
       debugLib("components DON'T exist");
       dataMethod = `
-        data() {
+        olumCompData() {
           return {
             name: "${className}",
             components: {},
