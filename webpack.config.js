@@ -24,8 +24,8 @@ module.exports = env => {
   const mode = !!env.dev ? "development" : "production";
   const globs = [path.resolve(__dirname, "./src/index.scss"), path.resolve(__dirname, "./src/index.js")];
   // add devtool if it exists
-  const devtoolExists = fs.existsSync(path.resolve(__dirname, "./devtool.js"));
-  if (mode === "development" && devtoolExists) globs.push(path.resolve(__dirname, "./devtool.js"));
+  const devtoolExists = fs.existsSync(path.resolve(__dirname, "../olum-devtool"));
+  if (mode === "development" && devtoolExists) globs.push(path.resolve(__dirname, "../olum-devtool"));
   const main = polyfill ? ["babel-polyfill", ...globs] : [...globs];
 
   const config = {
