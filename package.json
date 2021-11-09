@@ -1,6 +1,6 @@
 {
   "name": "olum-compiler",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "A module for compiling/bundling olumjs projects",
   "main": "bin/index.js",
   "bin": {
@@ -56,7 +56,8 @@
     "webpack-cli": "^4.5.0",
     "webpack-pwa-manifest": "^4.3.0",
     "workbox-webpack-plugin": "^6.1.5",
-    "olum-devtool": "latest"
+    "olum-devtool": "latest",
+    "string-replace-loader": "^3.0.3"
   },
   "browserslist": [
     "last 2 version",
