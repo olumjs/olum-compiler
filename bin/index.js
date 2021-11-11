@@ -18,7 +18,7 @@ process.on("unhandledRejection", err => {
 const requiredNodeMajorVer = +require("../package.json").engines.node.replace(/\<|\>|\=/gi,"").split(".")[0];
 const currentNodeMajorVer = +process.version.replace(/v/gi, "").split(".")[0];
 if (currentNodeMajorVer < requiredNodeMajorVer) {
-  console.error(`\nYour node version is "${currentNodeMajorVer}" which is not compatible with 'olum-compiler', Please upgrade to "${requiredNodeMajorVer}"\n`);
+  console.error(`\nYour node version is "${currentNodeMajorVer}" which is not compatible with 'olum-compiler', Please upgrade to "${requiredNodeMajorVer}" or higher\n`);
   process.exit(1);
 }
 

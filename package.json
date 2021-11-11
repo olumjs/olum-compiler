@@ -1,6 +1,6 @@
 {
   "name": "olum-compiler",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "A module for compiling/bundling olumjs projects",
   "main": "bin/index.js",
   "bin": {
@@ -22,7 +22,7 @@
   },
   "homepage": "https://github.com/olumjs/olum-compiler#readme",
   "engines": {
-    "node": ">=10"
+    "node": ">=14"
   },
   "dependencies": {
     "cross-spawn": "^7.0.3",
