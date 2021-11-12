@@ -365,12 +365,12 @@ class Compiler {
     if (isFullArr(modulesNames) && isFullArr(componentsNames)) { // there are components
       debugLib("components exist");
       const finalNames = [];
-      modulesNames.forEach(moduleName => componentsNames.forEach(compName => (moduleName !== "" && moduleName === compName) ? finalNames.push(moduleName) : null));
+      modulesNames.forEach(moduleName => componentsNames.forEach(compName => (moduleName !== "" && moduleName === compName) ? finalNames.push("{"+moduleName+"}") : null));
       dataMethod = `
         olumCompData() {
           return {
             name: "${className}",
-            components: { ${finalNames.join(", ")} },
+            components: [ ${finalNames.join(", ")} ],
             template: this.template(),
             style: this.style(),
             render: this.render.bind(this),
@@ -383,7 +383,7 @@ class Compiler {
         olumCompData() {
           return {
             name: "${className}",
-            components: {},
+            components: [],
             template: this.template(),
             style: this.style(),
             render: this.render.bind(this),
