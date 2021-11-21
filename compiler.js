@@ -299,7 +299,15 @@ class Compiler {
       const template = isFullArr(tempArr) ? tempArr[0] : ""; // get 1st template tag as the order of component file
       const markup = template.replace(this.regex.template.tag, "");
       const cleanHTML = markup.replace(this.regex.template.comment, ""); // clean html from comments
-      const html = "\n template() { \n return `" + cleanHTML + "`;\n}\n";
+      const html = `
+        template(arg) {
+          var olumTempOpeningTag = new RegExp("<[aA-zZ][\\\\s\\\\S]*?>");
+          var olumTempClosingTag = new RegExp("(</[aA-zZ]+>)$", "g");
+          var olumTemp = \`\n${cleanHTML}\n\`;
+          if (arg && arg === true) olumTemp = olumTemp.trim().replace(olumTempOpeningTag, '').replace(olumTempClosingTag, '');
+          return olumTemp;
+        }
+      `;
       resolve(html);
     });
   }
