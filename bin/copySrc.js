@@ -1,7 +1,7 @@
 // todo check changed files only to be copied, use this project https://github.com/eissapk/diff
 const path = require("path");
 const fs = require("fs");
-const { copy, remove } = require("../lib/helpers");
+const { copy, remove, rewriteImports } = require("../lib/helpers");
 
 const entryPoint = path.resolve(__dirname, "../../../src");
 const entryPoint2 = path.resolve(__dirname, "../../../public");
