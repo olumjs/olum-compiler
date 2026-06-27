@@ -17,11 +17,13 @@ function handleWsFile() {
 function getPath(entry, url) {
   entry = entry.endsWith("/") ? entry : entry + "/";
   url = url.startsWith("/") ? url.slice(1) : url;
+
   const paths = [
     path.resolve(entry, url),
     path.resolve(entry, "../", url),
     path.resolve(process.cwd(), url),
   ];
+
   return paths.find(fs.existsSync) || null;
 }
 // todo handle https
