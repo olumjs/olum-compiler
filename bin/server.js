@@ -39,13 +39,17 @@ function serve(entry, port) {
 
     const server = http.createServer(handler);
     function handler(req, res) {
-      if (req.url == "/") {
+      const urlPath = req.url.split("?")[0]; // strip query string before resolving
+
+      // serve the (ws-injected) index.html — used for "/" and as the history-mode SPA fallback
+      function serveIndex() {
         let indexPath = entry + "/index.html";
         if (!fs.existsSync(indexPath)) indexPath = entry + "/index.htm";
 
         fs.readFile(indexPath, (err, content) => {
           if (err) {
-            console.log(err);
+            res.writeHead(500, { "content-type": "text/plain" });
+            res.end("index.html not found");
             return reject(err);
           }
           const dom = new jsdom.JSDOM(content.toString()).window.document;
@@ -56,19 +60,26 @@ function serve(entry, port) {
           res.end("<!DOCTYPE html>" + html.outerHTML);
         });
       }
-      // handle files paths and mime types
-      const finalPath = getPath(entry, req.url);
-      if (finalPath) {
-        const isFile = fs.statSync(finalPath).isFile();
-        if (isFile) {
-          const ext = path.extname(finalPath).toLowerCase();
-          const obj = mimes.find(item => (ext === item.ext.toLowerCase() ? item : null));
-          if (obj) {
-            res.writeHead(200, { "Content-Type": obj.mime });
-            fs.createReadStream(finalPath).pipe(res);
-          }
-        }
+
+      if (urlPath === "/") return serveIndex();
+
+      // serve an existing static file with its mime type
+      const finalPath = getPath(entry, urlPath);
+      if (finalPath && fs.statSync(finalPath).isFile()) {
+        const ext = path.extname(finalPath).toLowerCase();
+        const obj = mimes.find(item => ext === item.ext.toLowerCase());
+        res.writeHead(200, { "Content-Type": obj ? obj.mime : "application/octet-stream" });
+        fs.createReadStream(finalPath).pipe(res);
+        return;
       }
+
+      // history-mode SPA fallback: a request with no file extension is a client-side route
+      // (e.g. /card) — serve index.html and let the olum router handle it. Anything with an
+      // extension is a genuinely missing asset, so return a real 404 instead of hanging.
+      if (!path.extname(urlPath)) return serveIndex();
+
+      res.writeHead(404, { "content-type": "text/plain" });
+      res.end("404 Not Found: " + urlPath);
     }
     const log = colors("cyan", "Serving ") + colors("green", domain);
     resolve({ server: server, wsPort: wsPort, PORT: PORT, log: log });
