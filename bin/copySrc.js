@@ -3,8 +3,11 @@ const path = require("path");
 const fs = require("fs");
 const { copy, remove, rewriteImports, ls, generateRouteManifest, generateImports, generateRoutes } = require("../lib/helpers");
 
-const entryPoint = path.resolve(__dirname, "../../src");
-const entryPoint2 = path.resolve(__dirname, "../../public");
+// const entryPoint = path.resolve(__dirname, "../../src");
+// const entryPoint2 = path.resolve(__dirname, "../../public");
+// fix for new router file based
+const entryPoint = path.resolve(process.cwd(), "src");
+const entryPoint2 = path.resolve(process.cwd(), "public");
 module.exports = function copySrc() {
   return new Promise((resolve, reject) => {
     try {
