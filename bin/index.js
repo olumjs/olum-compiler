@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 const path = require("path");
-const spawn = require("cross-spawn");
+const spawn = require("../lib/cross-spawn");
 const script = process.argv[2];
 
 if (typeof script !== undefined && ["dev", "build"].includes(script)) {

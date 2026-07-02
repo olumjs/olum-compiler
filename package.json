@@ -25,11 +25,7 @@
     "node": ">=14"
   },
   "dependencies": {
-    "chokidar": "^3.5.3",
-    "cross-spawn": "^7.0.3",
-    "esprima": "^4.0.1",
-    "jsdom": "^19.0.0",
-    "magic-string": "^0.26.7",
-    "ws": "^8.5.0"
+    "acorn": "^8.17.0",
+    "jsdom": "^19.0.0"
   }
 }

@@ -1,4 +1,4 @@
-const spawn = require("cross-spawn");
+const spawn = require("../lib/cross-spawn");
 const path = require("path");
 const fs = require("fs");
 const colors = require("../lib/colors");

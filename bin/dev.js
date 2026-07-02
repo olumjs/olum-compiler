@@ -2,7 +2,7 @@ const serve = require("./server");
 const watch = require("./watcher");
 const compile = require("./compiler");
 const copySrc = require("./copySrc");
-const WebSocket = require("ws");
+const WebSocket = require("../lib/websocket");
 const path = require("path");
 const fs = require("fs");
 

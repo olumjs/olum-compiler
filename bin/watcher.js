@@ -1,4 +1,4 @@
-const chokidar = require("chokidar");
+const chokidar = require("../lib/chokidar");
 const path = require("path");
 // Resolve against the project root (process.cwd()), same as copySrc.js.
 // The old "../../src" pointed at node_modules/src, which doesn't exist, so
