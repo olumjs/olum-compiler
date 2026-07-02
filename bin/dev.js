@@ -16,7 +16,12 @@ serve(entryPoint).then(({ server, wsPort, PORT, log, setWsPort }) => {
       server.on("error", (e) => { if (e.code === "EADDRINUSE") server.listen(++PORT); });
       server.listen(PORT, () => console.log(log.replace(/:\d+/, ":" + PORT)));
 
+      // Listen for adds, edits and deletes. Editors that save atomically
+      // (temp file + rename) surface edits as unlink+add rather than change,
+      // so watching only "change" misses new files and many edits.
+      watch.on("add", handleChange);
       watch.on("change", handleChange);
+      watch.on("unlink", handleChange);
 
       (function startWs(port) {
         const wss = new WebSocket.Server({ port });

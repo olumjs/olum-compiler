@@ -2,14 +2,9 @@
 const path = require("path");
 const fs = require("fs");
 const { copy, remove, routerParamsParser, ls, generateRouteManifest, generateImports, generateRoutes } = require("../lib/helpers");
+const entryPoint = path.resolve(process.cwd(), "src").replace(/\/module/, "");
+const entryPoint2 = path.resolve(process.cwd(), "public").replace(/\/module/, "");
 
-
-// for testing
-// const entryPoint = path.resolve(__dirname, "../../src");
-// const entryPoint2 = path.resolve(__dirname, "../../public");
-// for production
-const entryPoint = path.resolve(process.cwd(), "src");
-const entryPoint2 = path.resolve(process.cwd(), "public");
 module.exports = function copySrc() {
   return new Promise((resolve, reject) => {
     try {
@@ -38,8 +33,8 @@ module.exports = function copySrc() {
         const manifest = generateRouteManifest(routes, entryPoint);
         let has404Page = false;
         if (manifest['not-found']) has404Page = true;
-        const libImports = `import Olum from "/node_modules/olum/dist/olum.js";\nimport Router from "/node_modules/olum-router/dist/router.js";`; // for production
-        // const libImports = `import Olum from "../core/app.js";\nimport Router from "../core/router.js";`; // for testing 
+        const libImports = `import Olum from "/node_modules/olum/dist/olum.js";\nimport Router from "/node_modules/olum-router/dist/router.js";`;
+        // const libImports = `import Olum from "../core/olum.js";\nimport Router from "../core/router.js";`; // for testing 
         const imports = generateImports(manifest).replace(/.html/g, ".js"); // fix extension by replacing .html with .js since components are js modules
         const config = `const config = { mode: "history", root: "/", ${has404Page? `err: "/404",` : "" } routes: routes };\nconst router = new Router(config);\nnew Olum().$("#app").use(router);`;
         routes = generateRoutes(manifest);
