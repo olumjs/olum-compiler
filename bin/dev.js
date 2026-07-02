@@ -8,18 +8,25 @@ const fs = require("fs");
 
 let instance;
 const entryPoint = path.resolve(__dirname, "../public");
-serve(entryPoint).then(({ server, wsPort, PORT, log }) => {
+serve(entryPoint).then(({ server, wsPort, PORT, log, setWsPort }) => {
   // initial compiling
   copySrc().then(() => {
     compile().then(() => {
-      server.listen(PORT, () => console.log(log));
-      // console.log("initial compiling");
+      // EADDRINUSE is emitted as an 'error' event (not thrown), so retry on the next port
+      server.on("error", (e) => { if (e.code === "EADDRINUSE") server.listen(++PORT); });
+      server.listen(PORT, () => console.log(log.replace(/:\d+/, ":" + PORT)));
+
       watch.on("change", handleChange);
-      const wss = new WebSocket.Server({ port: wsPort });
-      wss.on("connection", (ws) => {
-        instance = ws;
-        ws.send(JSON.stringify({ msg: "connected" }));
-      });
+
+      (function startWs(port) {
+        const wss = new WebSocket.Server({ port });
+        wss.on("listening", () => setWsPort(port)); // tell server.js the real ws port to inject
+        wss.on("error", (e) => { if (e.code === "EADDRINUSE") startWs(port + 1); });
+        wss.on("connection", (ws) => {
+          instance = ws;
+          ws.send(JSON.stringify({ msg: "connected" }));
+        });
+      })(wsPort);
     });
   });
 });

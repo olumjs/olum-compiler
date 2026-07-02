@@ -1,11 +1,13 @@
 // todo check changed files only to be copied, use this project https://github.com/eissapk/diff
 const path = require("path");
 const fs = require("fs");
-const { copy, remove, rewriteImports, ls, generateRouteManifest, generateImports, generateRoutes } = require("../lib/helpers");
+const { copy, remove, routerParamsParser, ls, generateRouteManifest, generateImports, generateRoutes } = require("../lib/helpers");
 
+
+// for testing
 // const entryPoint = path.resolve(__dirname, "../../src");
 // const entryPoint2 = path.resolve(__dirname, "../../public");
-// fix for new router file based
+// for production
 const entryPoint = path.resolve(process.cwd(), "src");
 const entryPoint2 = path.resolve(process.cwd(), "public");
 module.exports = function copySrc() {
@@ -36,7 +38,8 @@ module.exports = function copySrc() {
         const manifest = generateRouteManifest(routes, entryPoint);
         let has404Page = false;
         if (manifest['not-found']) has404Page = true;
-        const libImports = `import Olum from "/node_modules/olum/dist/olum.js";\nimport Router from "/node_modules/olum-router/dist/router.js";`;
+        const libImports = `import Olum from "/node_modules/olum/dist/olum.js";\nimport Router from "/node_modules/olum-router/dist/router.js";`; // for production
+        // const libImports = `import Olum from "../core/app.js";\nimport Router from "../core/router.js";`; // for testing 
         const imports = generateImports(manifest).replace(/.html/g, ".js"); // fix extension by replacing .html with .js since components are js modules
         const config = `const config = { mode: "history", root: "/", ${has404Page? `err: "/404",` : "" } routes: routes };\nconst router = new Router(config);\nnew Olum().$("#app").use(router);`;
         routes = generateRoutes(manifest);
@@ -49,7 +52,15 @@ module.exports = function copySrc() {
         const mainJsPath = path.resolve(__dirname, "../src/main.js");
         fs.writeFileSync(mainJsPath, `${libImports}\n${imports}\n${routes}\n${config}`);
       });
-      copy(entryPoint2, path.resolve(__dirname, "../public"));
+      copy(entryPoint2, path.resolve(__dirname, "../public"), () => {
+        const indexHtmlPath = path.resolve(__dirname, "../public/index.html");
+        let indexHtmlContent = fs.readFileSync(indexHtmlPath).toString();
+        // auto bind router params handler
+        indexHtmlContent = indexHtmlContent.replace(/<body>/, `\n<body>\n${routerParamsParser}`);
+        // auto bind div#app placeholder and mainjs script to index.html
+        indexHtmlContent = indexHtmlContent.replace(/<\/body>/, `\n<div id="app"></div>\n<script defer type="module" src="../src/main.js"></script>\n</body>`);
+        fs.writeFileSync(indexHtmlPath, indexHtmlContent);
+      });
       resolve();
     } catch (err) {
       reject();

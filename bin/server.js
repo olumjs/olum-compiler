@@ -5,7 +5,7 @@ const http = require("http");
 const jsdom = require("jsdom");
 const colors = require("../lib/colors");
 const mimes = require("./mimes.json");
-const wsPort = 8090;
+let wsPort = 8090;
 
 function handleWsFile() {
   let file = fs.readFileSync(path.resolve(__dirname, "./ws.js")).toString();
@@ -18,13 +18,30 @@ function getPath(entry, url) {
   entry = entry.endsWith("/") ? entry : entry + "/";
   url = url.startsWith("/") ? url.slice(1) : url;
 
-  const paths = [
-    path.resolve(entry, url),
-    path.resolve(entry, "../", url),
-    path.resolve(process.cwd(), url),
-  ];
+  const resolve = candidate =>
+    [
+      path.resolve(entry, candidate),
+      path.resolve(entry, "../", candidate),
+      path.resolve(process.cwd(), candidate),
+    ].find(p => fs.existsSync(p) && fs.statSync(p).isFile()) || null;
 
-  return paths.find(fs.existsSync) || null;
+  // Exact match first (preserves the original behaviour).
+  const direct = resolve(url);
+  if (direct) return direct;
+
+  // Assets are referenced relatively in index.html (e.g. "./main.css"), so when
+  // a nested client-side route like /blog/x is open the browser requests them as
+  // /blog/main.css. Progressively drop leading route segments so the asset still
+  // resolves to its real location (/blog/main.css -> main.css).
+  if (path.extname(url)) {
+    const segments = url.split("/");
+    for (let i = 1; i < segments.length; i++) {
+      const found = resolve(segments.slice(i).join("/"));
+      if (found) return found;
+    }
+  }
+
+  return null;
 }
 // todo handle https
 /**
@@ -82,7 +99,10 @@ function serve(entry, port) {
       res.end("404 Not Found: " + urlPath);
     }
     const log = colors("cyan", "Serving ") + colors("green", domain);
-    resolve({ server: server, wsPort: wsPort, PORT: PORT, log: log });
+    // setWsPort lets dev.js report the port the ws server actually bound to (it may
+    // retry off 8090 if that's taken) so handleWsFile injects the matching port.
+    const setWsPort = (port) => { wsPort = port; };
+    resolve({ server: server, wsPort: wsPort, PORT: PORT, log: log, setWsPort: setWsPort });
   });
 }
 
