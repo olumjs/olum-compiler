@@ -1,7 +1,7 @@
 // todo check changed files only to be copied, use this project https://github.com/eissapk/diff
 const path = require("path");
 const fs = require("fs");
-const { copy, remove, routerParamsParser, ls, generateRouteManifest, generateImports, generateRoutes } = require("../lib/helpers");
+const { copy, remove, ls, generateRouteManifest, generateImports, generateRoutes } = require("../lib/helpers");
 const entryPoint = path.resolve(process.cwd(), "src").replace(/\/module/, "");
 const entryPoint2 = path.resolve(process.cwd(), "public").replace(/\/module/, "");
 
@@ -50,8 +50,6 @@ module.exports = function copySrc() {
       copy(entryPoint2, path.resolve(__dirname, "../public"), () => {
         const indexHtmlPath = path.resolve(__dirname, "../public/index.html");
         let indexHtmlContent = fs.readFileSync(indexHtmlPath).toString();
-        // auto bind router params handler
-        indexHtmlContent = indexHtmlContent.replace(/<body>/, `\n<body>\n${routerParamsParser}`);
         // auto bind div#app placeholder and mainjs script to index.html
         indexHtmlContent = indexHtmlContent.replace(/<\/body>/, `\n<div id="app"></div>\n<script defer type="module" src="../src/main.js"></script>\n</body>`);
         fs.writeFileSync(indexHtmlPath, indexHtmlContent);
