@@ -6,6 +6,9 @@
   "bin": {
     "olum-compiler": "bin/index.js"
   },
+  "scripts": {
+    "test": "node ./tests/compiler.test.js"
+  },
   "author": "Eissa Saber",
   "license": "MIT",
   "repository": {
