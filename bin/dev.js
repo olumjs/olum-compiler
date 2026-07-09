@@ -24,7 +24,8 @@ serve(entryPoint).then(({ server, wsPort, PORT, log, setWsPort }) => {
       watch.on("unlink", handleChange);
 
       (function startWs(port) {
-        const wss = new WebSocket.Server({ port });
+        // const wss = new WebSocket.Server({ port });
+        const wss = new WebSocket.Server({ server }); // using the same server port
         wss.on("listening", () => setWsPort(port)); // tell server.js the real ws port to inject
         wss.on("error", (e) => { if (e.code === "EADDRINUSE") startWs(port + 1); });
         wss.on("connection", (ws) => {

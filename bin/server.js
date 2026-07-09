@@ -5,11 +5,11 @@ const http = require("http");
 const jsdom = require("jsdom");
 const colors = require("../lib/colors");
 const mimes = require("./mimes.json");
-let wsPort = 8090;
+let wsPort = 8090; // old way of ws -- it was using seperated port from server
 
 function handleWsFile() {
   let file = fs.readFileSync(path.resolve(__dirname, "./ws.js")).toString();
-  file = file.replace(/{{port}}/, wsPort);
+  // file = file.replace(/{{port}}/, wsPort);
   file = "<script>" + file + "</script>";
   return file;
 }
@@ -51,7 +51,7 @@ function getPath(entry, url) {
  */
 function serve(entry, port) {
   return new Promise((resolve, reject) => {
-    const PORT = port ? port : process.env.PORT || 8000;
+    const PORT = Number(port || process.env.PORT || 3000);
     const domain = `http://localhost:${PORT}`;
 
     const server = http.createServer(handler);

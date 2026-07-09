@@ -4,7 +4,9 @@
     const interval = 500;
     const maxAttempts = 30;
     let attempts = 0;
-    const socketUrl = "ws://localhost:{{port}}";
+    const wsProtocol = location.protocol === "https:" ? "wss:" : "ws:";
+    // const socketUrl = `${wsProtocol}//${location.hostname}:{{port}}`;
+    const socketUrl = `${wsProtocol}//${location.host}`;   // removing port so it uses the server port
     let socket = new WebSocket(socketUrl);
 
     socket.onmessage = function (res) {
