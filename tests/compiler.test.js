@@ -49,13 +49,23 @@ function tmpl(out) {
   return m ? m[1] : "";
 }
 
+// Current section, tracked so a failure can point at the category to look into.
+let currentSection = "(no section)";
+const failedSections = []; // { section, name } per failure, for the end-of-run recap
+
+function recordFail(name) {
+  failed++;
+  failedSections.push({ section: currentSection, name });
+}
+
 function check(name, template, assertion) {
   let out;
   try {
     out = compile(template);
   } catch (e) {
-    failed++;
+    recordFail(name);
     console.log("  " + FAIL_ICON + " " + name + dim("  (threw: " + e.message + ")"));
+    console.log("      " + dim("↳ in " + currentSection));
     return;
   }
   let ok = false;
@@ -69,7 +79,7 @@ function check(name, template, assertion) {
     passed++;
     console.log("  " + PASS_ICON + " " + name);
   } else {
-    failed++;
+    recordFail(name);
     // On a plain assertion miss (no thrown error) show the rendered template so a
     // failure is diagnosable without re-instrumenting the test.
     if (!detail) {
@@ -81,10 +91,12 @@ function check(name, template, assertion) {
       detail = dim(detail);
     }
     console.log("  " + FAIL_ICON + " " + red(name) + detail);
+    console.log("      " + dim("↳ in " + currentSection));
   }
 }
 
 function section(title) {
+  currentSection = title;
   console.log("\n" + bold(cyan(title)));
 }
 
@@ -409,6 +421,21 @@ check(
 console.log("\n========================");
 const summary = `${passed} passed, ${failed} failed`;
 console.log((failed ? red(bold(summary)) : green(bold(summary))) + "\n");
+
+// Recap which section(s) to look into, grouped so a run with several failures is
+// still scannable ("go check §11b").
+if (failed) {
+  const bySection = {};
+  failedSections.forEach(({ section, name }) => {
+    (bySection[section] = bySection[section] || []).push(name);
+  });
+  console.log(bold("Failed in:"));
+  Object.keys(bySection).forEach((sec) => {
+    console.log("  " + red(sec));
+    bySection[sec].forEach((name) => console.log("    " + dim("• " + name)));
+  });
+  console.log("");
+}
 
 // Guard against a whole section silently disappearing (a bad merge, a `check` that
 // throws before registering, etc.). Bump EXPECTED_CHECKS when you add/remove tests.
