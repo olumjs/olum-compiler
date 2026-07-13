@@ -170,6 +170,32 @@ check(
   (out) => /style="color:\$\{olum\.esc\(state\.color\)\}; padding:8px;"/.test(tmpl(out)) && parses(out)
 );
 
+// boolean attributes are truthy by PRESENCE (checked="false" is still checked), so
+// attr="{expr}" must toggle the attribute's existence, never interpolate its value
+check(
+  "boolean attribute compiles to a presence toggle (checked)",
+  comp(`<input type="checkbox" checked="{state.count}" />`),
+  (out) => /\$\{\(state\.count\) \? "checked" : ""\}/.test(tmpl(out)) && !/checked="\$\{olum\.esc/.test(tmpl(out)) && parses(out)
+);
+
+check(
+  "boolean attribute with an expression (disabled)",
+  comp(`<button disabled="{!state.count}">Go</button>`),
+  (out) => /\$\{\(!state\.count\) \? "disabled" : ""\}/.test(tmpl(out)) && parses(out)
+);
+
+check(
+  "static boolean attribute is left alone",
+  comp(`<input type="text" disabled />`),
+  (out) => /disabled/.test(tmpl(out)) && !/\? "disabled"/.test(tmpl(out)) && parses(out)
+);
+
+check(
+  "boolean attribute inside <for> stays a presence toggle",
+  comp(`<for each="x of state.items"><option selected="{x.id === state.count}">{x.name}</option></for>`),
+  (out) => /\$\{\(x\.id === state\.count\) \? "selected" : ""\}/.test(tmpl(out)) && parses(out)
+);
+
 // ── §6 Events on* (code in "") ─────────────────────────────────────────────
 section("§6 Events");
 
@@ -324,6 +350,26 @@ check(
 );
 
 check(
+  "forwarding a destructured prop emits a kind-props source (function props survive nesting)",
+  comp(`<C onMessage="{onMessage}" />`, `import C from "./C";\nconst { onMessage } = props();`),
+  (out) => /data-o-props-src="onMessage:props:onMessage"/.test(out) && /onMessage: onMessage/.test(out) && !/onMessage:method/.test(out) && parses(out)
+);
+
+check(
+  "forwarding a RENAMED destructured prop keys the source by the original prop name",
+  comp(`<C onMessage="{om}" />`, `import C from "./C";\nconst { onMessage: om } = props();`),
+  (out) => /data-o-props-src="onMessage:props:onMessage"/.test(out) && parses(out)
+);
+
+check(
+  // a destructured prop isn't in methodsRef, so the data-o-event chain can't dispatch it by
+  // name — the compiler must wrap the call in an anon handler whose closure holds the prop
+  "calling a destructured prop in an event handler wraps it in an anon method",
+  comp(`<button onclick="onclick()">x</button>`, `const { onclick } = props();`),
+  (out) => /__olumAnon_\w+ = \(\$event\) => \{ onclick\(\) \}/.test(out) && /onclick\|__olumAnon_/.test(out) && parses(out)
+);
+
+check(
   "forwarding a function prop records a props source (resolved live at runtime)",
   comp(`<C fn="{props().onSave}" />`, `import C from "./C";\nimport { props } from "../core/olum.js";`),
   (out) => /fn:props:onSave/.test(out) && parses(out)
@@ -384,9 +430,12 @@ check(
 section("§16 Scoped CSS");
 
 check(
-  "styles are scoped with a [data-o-*] prefix and injected",
-  comp(`<div class="box"></div>`).replace("</script>", "</script>\n<style>.box{color:red}</style>"),
-  (out) => /\[data-o-\w+\] \.box/.test(out) && /olum\.injectStyle\(/.test(out) && parses(out)
+  // the scope attr attaches to the selector's LAST COMPOUND (.box[data-o-x], p[data-o-x]:hover),
+  // not as a `[data-o-x] .box` descendant prefix — a descendant rule would also match nested
+  // components' elements, which sit inside this component's DOM but carry their own scope attr
+  "styles are scoped onto the selector's last compound and injected",
+  comp(`<div class="box"></div>`).replace("</script>", "</script>\n<style>.box{color:red}\np:hover{color:blue}</style>"),
+  (out) => /\.box\[data-o-\w+\]/.test(out) && /p\[data-o-\w+\]:hover/.test(out) && /olum\.injectStyle\(/.test(out) && parses(out)
 );
 
 // ── §17 Imports ─────────────────────────────────────────────────────────────
@@ -418,6 +467,105 @@ check(
   (out) => /<olum name="C"/.test(tmpl(out)) && !/data-o-props=/.test(tmpl(out)) && parses(out)
 );
 
+// ── §20 File-based routing (compileRoutes) ──────────────────────────────────
+// compileRoutes(entryPoint) scans a src tree and emits the router entry module:
+// imports + `export const routes = [...]` + Router/Olum bootstrap. Unlike the
+// parser checks above it reads the filesystem, so each check builds a throwaway
+// fixture tree in the OS temp dir and removes it afterwards.
+section("§20 File-based routing (compileRoutes)");
+
+const { compileRoutes } = require("../lib/helpers");
+const fs = require("fs");
+const os = require("os");
+const nodePath = require("path");
+
+// like check() but for units that aren't parser(template): producer() returns
+// the value under test (and owns its fixture setup/teardown)
+function checkFn(name, producer, assertion) {
+  let out;
+  try {
+    out = producer();
+  } catch (e) {
+    recordFail(name);
+    console.log("  " + FAIL_ICON + " " + name + dim("  (threw: " + e.message + ")"));
+    console.log("      " + dim("↳ in " + currentSection));
+    return;
+  }
+  let ok = false;
+  let detail = "";
+  try {
+    ok = assertion(out);
+  } catch (e) {
+    detail = dim(" (" + e.message + ")");
+  }
+  if (ok) {
+    passed++;
+    console.log("  " + PASS_ICON + " " + name);
+  } else {
+    recordFail(name);
+    if (!detail) detail = "\n      " + dim(String(out).replace(/\s+/g, " ").slice(0, 200));
+    console.log("  " + FAIL_ICON + " " + red(name) + detail);
+    console.log("      " + dim("↳ in " + currentSection));
+  }
+}
+
+function withRouteTree(files, fn) {
+  const root = fs.mkdtempSync(nodePath.join(os.tmpdir(), "olum-routes-"));
+  try {
+    files.forEach((f) => {
+      const abs = nodePath.join(root, f);
+      fs.mkdirSync(nodePath.dirname(abs), { recursive: true });
+      fs.writeFileSync(abs, "<div></div>");
+    });
+    return fn(root);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+checkFn(
+  "route tree compiles: / first, /404 last, [param] -> :param, (group) and NN- prefixes stripped",
+  () =>
+    withRouteTree(
+      [
+        "page.html",
+        "not-found.html",
+        "about/page.html",
+        "(main)/club/page.html",
+        "01-blog/[slug]/page.html",
+        "components/Widget.html", // excluded dir — never a route
+        "_drafts/page.html", // _-prefixed dir — excluded
+      ],
+      (root) => compileRoutes(root)
+    ),
+  (out) => {
+    const paths = [...out.matchAll(/path: "([^"]+)"/g)].map((m) => m[1]);
+    return (
+      /import App from "\.\/page\.js";/.test(out) &&
+      /import NotFound from "\.\/not-found\.js";/.test(out) &&
+      /import About from "\.\/about\/page\.js";/.test(out) &&
+      // imports keep the REAL file location; only route path/comp are cleaned
+      /import Club from "\.\/\(main\)\/club\/page\.js";/.test(out) &&
+      /import BlogSlug from "\.\/01-blog\/\[slug\]\/page\.js";/.test(out) &&
+      /\{ path: "\/club", comp: Club \}/.test(out) &&
+      /\{ path: "\/blog\/:slug", comp: BlogSlug \}/.test(out) &&
+      /\{ path: "\/about", comp: About \}/.test(out) &&
+      paths[0] === "/" &&
+      paths[paths.length - 1] === "/404" &&
+      /err: "\/404",/.test(out) && // not-found.html wires the router's 404 redirect
+      !/Widget|_drafts|Drafts/.test(out) && // excluded dirs leave no trace
+      /new Router\(config\)/.test(out) &&
+      /new Olum\(\)\.\$\("#app"\)\.use\(router\)/.test(out)
+    );
+  }
+);
+
+checkFn(
+  "no not-found.html -> no /404 route and no err in the router config",
+  () => withRouteTree(["page.html", "about/page.html"], (root) => compileRoutes(root)),
+  (out) => !/\/404/.test(out) && !/err:/.test(out) && /\{ path: "\/", comp: App \}/.test(out) && /\{ path: "\/about", comp: About \}/.test(out)
+);
+
 console.log("\n========================");
 const summary = `${passed} passed, ${failed} failed`;
 console.log((failed ? red(bold(summary)) : green(bold(summary))) + "\n");
@@ -439,7 +587,7 @@ if (failed) {
 
 // Guard against a whole section silently disappearing (a bad merge, a `check` that
 // throws before registering, etc.). Bump EXPECTED_CHECKS when you add/remove tests.
-const EXPECTED_CHECKS = 42;
+const EXPECTED_CHECKS = 51;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(yellow(`⚠ ran ${total} checks but expected ${EXPECTED_CHECKS} — did a test get dropped?`) + "\n");

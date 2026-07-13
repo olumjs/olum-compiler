@@ -2,6 +2,7 @@
 const path = require("path");
 const fs = require("fs");
 const { copy, remove, compileRoutes } = require("../lib/helpers");
+const importMap = require("../lib/importMap");
 const entryPoint = path.resolve(process.cwd(), "src").replace(/\/module/, "");
 const entryPoint2 = path.resolve(process.cwd(), "public").replace(/\/module/, "");
 
@@ -21,8 +22,9 @@ module.exports = function copySrc() {
       copy(entryPoint2, path.resolve(__dirname, "../public"), () => {
         const indexHtmlPath = path.resolve(__dirname, "../public/index.html");
         let indexHtmlContent = fs.readFileSync(indexHtmlPath).toString();
-        // auto bind div#app placeholder and mainjs script to index.html
-        indexHtmlContent = indexHtmlContent.replace(/<\/body>/, `\n<div id="app"></div>\n<script defer type="module" src="../src/main.js"></script>\n</body>`);
+        // auto bind div#app placeholder, import map and mainjs script to index.html
+        // (import map must precede the module script so bare imports resolve)
+        indexHtmlContent = indexHtmlContent.replace(/<\/body>/, `\n<div id="app"></div>\n${importMap(entryPoint)}\n<script defer type="module" src="../src/main.js"></script>\n</body>`);
         fs.writeFileSync(indexHtmlPath, indexHtmlContent);
       });
       resolve();

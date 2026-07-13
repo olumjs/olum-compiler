@@ -23,6 +23,7 @@ function getPath(entry, url) {
       path.resolve(entry, candidate),
       path.resolve(entry, "../", candidate),
       path.resolve(process.cwd(), candidate),
+      path.resolve(entry, "../../", candidate), // project root — app deps (/node_modules/*) install there
     ].find(p => fs.existsSync(p) && fs.statSync(p).isFile()) || null;
 
   // Exact match first (preserves the original behaviour).
