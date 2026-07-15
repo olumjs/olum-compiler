@@ -149,6 +149,14 @@ check(
   (out) => /\$\{olum\.esc\(state\.count \+ 1\)\}/.test(tmpl(out)) && parses(out)
 );
 
+// jsdom entity-encodes <,>,& in text nodes on serialize — the escape pass must decode them
+// back inside the captured expr or the emitted JS is broken (`width &gt; 380` → SyntaxError)
+check(
+  "comparison operators in a text {expr} survive the jsdom round-trip",
+  comp(`<p>{state.width > 380 && state.width < 800 ? 'mid' : 'other'}</p>`),
+  (out) => /olum\.esc\(state\.width > 380 && state\.width < 800 \? 'mid' : 'other'\)/.test(tmpl(out)) && parses(out)
+);
+
 // ── §5 String attributes (literal + {expr}) ────────────────────────────────
 section("§5 String attributes");
 
@@ -168,6 +176,21 @@ check(
   "dynamic string style interpolates",
   comp(`<div style="color:{state.color}; padding:8px;"></div>`),
   (out) => /style="color:\$\{olum\.esc\(state\.color\)\}; padding:8px;"/.test(tmpl(out)) && parses(out)
+);
+
+// textarea has no `value` attribute in HTML (its value is its text content), so a
+// serialized value="..." would be silently dropped by the browser's parser —
+// the compiler must move it into the element's content
+check(
+  "textarea value attribute becomes text content",
+  comp(`<textarea value="{state.cls}"></textarea>`),
+  (out) => /<textarea[^>]*>\$\{olum\.esc\(state\.cls\)\}<\/textarea>/.test(tmpl(out)) && !/value=/.test(tmpl(out)) && parses(out)
+);
+
+check(
+  "textarea value attribute wins over authored content",
+  comp(`<textarea value="{state.cls}">stale</textarea>`),
+  (out) => /<textarea[^>]*>\$\{olum\.esc\(state\.cls\)\}<\/textarea>/.test(tmpl(out)) && !/stale/.test(tmpl(out)) && parses(out)
 );
 
 // boolean attributes are truthy by PRESENCE (checked="false" is still checked), so
@@ -216,11 +239,31 @@ check(
   comp(`<input oninput="setVal($event)" />`, `const setVal = (e) => 0;`),
   (out) => /oninput\|setVal=\$\{JSON\.stringify\(\['\$event'\]\)\}/.test(tmpl(out)) && parses(out)
 );
-
 check(
   "inline arrow handler becomes a named __olumAnon_ method",
   comp(`<input oninput="(e) => state.name = e.target.value" />`),
   (out) => /__olumAnon_\w+/.test(out) && /data-o-event/.test(tmpl(out)) && parses(out)
+);
+
+// anon handlers are hoisted to component scope where <for> loop variables don't exist,
+// so a referenced loop variable must become a handler parameter whose per-item value
+// is serialized into the data-o-event args at render time
+check(
+  "anon handler inside <for> receives the loop variable as an argument",
+  comp(
+    `<for each="flavour of state.items"><input type="checkbox" onchange="toggle(flavour)($event)" /></for>`,
+    `const toggle = (f) => (e) => 0;`
+  ),
+  (out) =>
+    /const __olumAnon_\w+ = \(\$event, flavour\) => \{ toggle\(flavour\)\(\$event\) \}/.test(out) &&
+    /JSON\.stringify\(\['\$event', flavour\]\)/.test(tmpl(out)) &&
+    parses(out)
+);
+
+check(
+  "inline arrow handler inside <for> receives the loop variable as an argument",
+  comp(`<for each="(x, i) of state.items"><button onclick="(e) => state.count = i">x</button></for>`),
+  (out) => /const __olumAnon_\w+ = \(\$event, i\) =>/.test(out) && /JSON\.stringify\(\['\$event', i\]\)/.test(tmpl(out)) && parses(out)
 );
 
 // ── §7 Conditionals <if>/<else-if>/<else> ──────────────────────────────────
@@ -272,6 +315,20 @@ check(
   "keyed loop stamps data-o-key on a component placeholder",
   comp(`<for each="item of state.items" key="item.id"><Row item="{item}" /></for>`, `import Row from "./Row";`),
   (out) => /data-o-key/.test(tmpl(out)) && parses(out)
+);
+
+// the HTML parser drops unknown tags inside <select> and foster-parents them out of tables —
+// the tag shield (tokens.js) must keep <for>/<if> alive in these containers
+check(
+  "<for> inside <select> survives the parse and scopes the loop variable",
+  comp(`<select><for each="q of state.questions"><option value="{q.id}">{q.text}</option></for></select>`),
+  (out) => /<select>\$\{state\.questions\.map\(function\(q\)/.test(tmpl(out)) && !/<olum-select/.test(tmpl(out)) && parses(out)
+);
+
+check(
+  "<for> inside <table>/<tbody> is not foster-parented out",
+  comp(`<table><tbody><for each="row of state.rows"><tr><td>{row.a}</td></tr></for></tbody></table>`),
+  (out) => /<tbody>\$\{state\.rows\.map\(function\(row\)/.test(tmpl(out)) && /<tr><td>/.test(tmpl(out)) && parses(out)
 );
 
 // ── §10 Raw HTML (html="expr" + olum.html()) ───────────────────────────────
@@ -587,7 +644,7 @@ if (failed) {
 
 // Guard against a whole section silently disappearing (a bad merge, a `check` that
 // throws before registering, etc.). Bump EXPECTED_CHECKS when you add/remove tests.
-const EXPECTED_CHECKS = 51;
+const EXPECTED_CHECKS = 58;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(yellow(`⚠ ran ${total} checks but expected ${EXPECTED_CHECKS} — did a test get dropped?`) + "\n");

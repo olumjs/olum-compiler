@@ -74,7 +74,7 @@ function serve(entry, port) {
           const html = dom.querySelector("html");
           const wsContent = handleWsFile();
           dom.body.insertAdjacentHTML("beforeend", wsContent);
-          res.writeHead(200, { "content-type": "text/html" });
+          res.writeHead(200, { "content-type": "text/html", "cache-control": "no-cache" });
           res.end("<!DOCTYPE html>" + html.outerHTML);
         });
       }
@@ -86,7 +86,9 @@ function serve(entry, port) {
       if (finalPath && fs.statSync(finalPath).isFile()) {
         const ext = path.extname(finalPath).toLowerCase();
         const obj = mimes.find(item => ext === item.ext.toLowerCase());
-        res.writeHead(200, { "Content-Type": obj ? obj.mime : "application/octet-stream" });
+        // no-cache: without it browsers heuristically cache served JS (no headers at all),
+        // so a framework/runtime edit keeps running stale code until a hard refresh
+        res.writeHead(200, { "Content-Type": obj ? obj.mime : "application/octet-stream", "Cache-Control": "no-cache" });
         fs.createReadStream(finalPath).pipe(res);
         return;
       }
