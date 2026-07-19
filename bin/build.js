@@ -1,9 +1,15 @@
-const path = require("path");
-const mode = require("../lib/mode");
-console.log("build.js");
+const bundle = require("./bundle");
+const compile = require("./compiler");
+const copySrc = require("./copySrc");
 
-const files = [
-    path.resolve(__dirname, "../core/devtool.js"),
-    path.resolve(__dirname, "../lib/parser.js")
-];
-// mode(files, false); // related to isDev prop
+(async function () {
+  const bootAt = Date.now();
+  try {
+    await copySrc();
+    await compile();
+    await bundle(bootAt);
+  } catch (error) {
+    console.error(error);
+    process.exitCode = 1; // a failed build must not report success to CI
+  }
+})();

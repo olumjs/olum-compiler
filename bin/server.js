@@ -53,7 +53,6 @@ function getPath(entry, url) {
 function serve(entry, port) {
   return new Promise((resolve, reject) => {
     const PORT = Number(port || process.env.PORT || 3000);
-    const domain = `http://localhost:${PORT}`;
 
     const server = http.createServer(handler);
     function handler(req, res) {
@@ -101,7 +100,7 @@ function serve(entry, port) {
       res.writeHead(404, { "content-type": "text/plain" });
       res.end("404 Not Found: " + urlPath);
     }
-    const log = colors("cyan", "Serving ") + colors("green", domain);
+    const log = colors("cyan", "Serving ") + colors("green", "port " + PORT); // port only — a URL would show "localhost" even on a live server
     // setWsPort lets dev.js report the port the ws server actually bound to (it may
     // retry off 8090 if that's taken) so handleWsFile injects the matching port.
     const setWsPort = (port) => { wsPort = port; };

@@ -409,7 +409,7 @@ check(
 check(
   "forwarding a destructured prop emits a kind-props source (function props survive nesting)",
   comp(`<C onMessage="{onMessage}" />`, `import C from "./C";\nconst { onMessage } = props();`),
-  (out) => /data-o-props-src="onMessage:props:onMessage"/.test(out) && /onMessage: onMessage/.test(out) && !/onMessage:method/.test(out) && parses(out)
+  (out) => /data-o-props-src="onMessage:props:onMessage"/.test(out) && /onMessage: __props\.onMessage/.test(out) && !/onMessage:method/.test(out) && parses(out)
 );
 
 check(
@@ -423,7 +423,8 @@ check(
   // name — the compiler must wrap the call in an anon handler whose closure holds the prop
   "calling a destructured prop in an event handler wraps it in an anon method",
   comp(`<button onclick="onclick()">x</button>`, `const { onclick } = props();`),
-  (out) => /__olumAnon_\w+ = \(\$event\) => \{ onclick\(\) \}/.test(out) && /onclick\|__olumAnon_/.test(out) && parses(out)
+  // liveProps also rewrites the closure body to a live read: { props(_storeKey).onclick() }
+  (out) => /__olumAnon_\w+ = \(\$event\) => \{ __props\.onclick\(\) \}/.test(out) && /onclick\|__olumAnon_/.test(out) && parses(out)
 );
 
 check(
@@ -623,6 +624,48 @@ checkFn(
   (out) => !/\/404/.test(out) && !/err:/.test(out) && /\{ path: "\/", comp: App \}/.test(out) && /\{ path: "\/about", comp: About \}/.test(out)
 );
 
+// ── §21 live destructured props (lib/liveProps.js) ────────────────────────────
+// `const { x } = props()` bindings are rewritten at every reference into live
+// props(_storeKey).x reads — templates, methods, and anonymous handlers alike.
+section("§21 Live destructured props");
+
+const LIVE_FIXTURE = `<script>
+  import { props } from "olum";
+  const { color, size = "md", theme: t } = props();
+  const shout = () => color + "!";
+  const shadowed = (color) => color.trim();
+  const payload = () => ({ color });
+  const keyed = { color: 1 };
+  const member = (o) => o.color;
+</script>
+<p>{color} {size} {t}</p>
+<for each="color of [1,2]"><i>{color}</i></for>`;
+
+check("template reference becomes a live read", LIVE_FIXTURE, (out) => /esc\(__props\.color\)/.test(tmpl(out)));
+
+check("method body reference is rewritten too", LIVE_FIXTURE, (out) => /__props\.color \+ "!"/.test(out));
+
+check("a default becomes an undefined-guarded ternary", LIVE_FIXTURE, (out) =>
+  /__props\.size === undefined \? \("md"\) : __props\.size/.test(out)
+);
+
+check("an alias reads its original prop key", LIVE_FIXTURE, (out) => /esc\(__props\.theme\)/.test(tmpl(out)));
+
+check("a shadowing param is left alone", LIVE_FIXTURE, (out) => /\(color\) => color\.trim\(\)/.test(out));
+
+// the <for> compiles color into a callback param; the inner {color} must stay bare
+check("a loop variable shadowing the prop is left alone", LIVE_FIXTURE, (out) =>
+  /map\(function\(color\)/.test(tmpl(out)) && /<i>\$\{olum\.esc\(color\)\}<\/i>/.test(tmpl(out))
+);
+
+check("object-expression shorthand expands with its key; keys and members untouched", LIVE_FIXTURE, (out) =>
+  /\(\{ color: __props\.color \}\)/.test(out) && /\{ color: 1 \}/.test(out) && /o\.color/.test(out)
+);
+
+check("the declaration is kept and the output still parses", LIVE_FIXTURE, (out) =>
+  /\{ color, size = "md", theme: t \} = props\(_storeKey\)/.test(out) && parses(out)
+);
+
 console.log("\n========================");
 const summary = `${passed} passed, ${failed} failed`;
 console.log((failed ? red(bold(summary)) : green(bold(summary))) + "\n");
@@ -644,7 +687,7 @@ if (failed) {
 
 // Guard against a whole section silently disappearing (a bad merge, a `check` that
 // throws before registering, etc.). Bump EXPECTED_CHECKS when you add/remove tests.
-const EXPECTED_CHECKS = 58;
+const EXPECTED_CHECKS = 66;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(yellow(`⚠ ran ${total} checks but expected ${EXPECTED_CHECKS} — did a test get dropped?`) + "\n");

@@ -1,10 +1,12 @@
 const chokidar = require("../lib/chokidar");
 const path = require("path");
+const fs = require("fs");
 // Resolve against the project root (process.cwd()), same as copySrc.js.
 // The old "../../src" pointed at node_modules/src, which doesn't exist, so
 // chokidar watched 0 directories and never detected any changes.
-const entryPoint = path.resolve(process.cwd(), "src").replace(/\/module/, "");
-const entryPoint2 = path.resolve(process.cwd(), "public").replace(/\/module/, "");
+const cwd = process.cwd();
+const entryPoint = path.resolve(cwd.replace(/\/module$/, ""), "src")
+const entryPoint2 = path.resolve(cwd.replace(/\/module$/, ""), "public")
 // let ignoreRegex = /\_\.js$/;
 // module.exports = chokidar.watch(entryPoint, {ignored: ignoreRegex, persistent: true });
 // ignoreInitial: don't fire "add" for every existing file on startup (initial
@@ -15,3 +17,8 @@ module.exports = chokidar.watch([entryPoint, entryPoint2], {
   ignoreInitial: true,
   awaitWriteFinish: { stabilityThreshold: 150, pollInterval: 50 },
 });
+
+// Debug trail: log every event of this session to lib/changes.txt (newest last)
+const changesLog = path.resolve(__dirname, "../lib/changes.txt"); // e.g. "add /path/to/src/page.html"
+fs.writeFileSync(changesLog, ""); // start fresh each session
+["add", "change", "unlink", "addDir", "unlinkDir"].forEach((event) => module.exports.on(event, (file) => fs.appendFileSync(changesLog, `${event} ${file}\n`))); // one line per event
