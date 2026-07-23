@@ -10,6 +10,6 @@ const copySrc = require("./copySrc");
     await bundle(bootAt);
   } catch (error) {
     console.error(error);
-    process.exitCode = 1; // a failed build must not report success to CI
+    process.exitCode = 1;
   }
 })();
