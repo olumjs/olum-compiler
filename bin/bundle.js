@@ -99,6 +99,25 @@ async function bundle(bootAt) {
     build: {
       outDir,
       emptyOutDir: true,
+
+      assetsInlineLimit: 0,
+      rollupOptions: {
+        output: {
+          assetFileNames(info) {
+            const orig = (info.originalFileNames || [])[0];
+            const name = (info.names || [])[0] || "";
+            if (
+              orig &&
+              !orig.startsWith("..") &&
+              !path.isAbsolute(orig) &&
+              path.extname(orig) === path.extname(name)
+            ) {
+              return orig;
+            }
+            return "assets/[name]-[hash][extname]";
+          },
+        },
+      },
     },
   });
 
