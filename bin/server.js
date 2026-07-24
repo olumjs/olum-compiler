@@ -40,7 +40,7 @@ function getPath(entry, url) {
   return null;
 }
 
-function serve(entry, port) {
+function serve(entry, port, mode = "development") {
   return new Promise((resolve, reject) => {
     const PORT = Number(port || process.env.PORT || 3000);
 
@@ -60,8 +60,10 @@ function serve(entry, port) {
           }
           const dom = new jsdom.JSDOM(content.toString()).window.document;
           const html = dom.querySelector("html");
-          const wsContent = handleWsFile();
-          dom.body.insertAdjacentHTML("beforeend", wsContent);
+          if (mode == "development") {
+            const wsContent = handleWsFile();
+            dom.body.insertAdjacentHTML("beforeend", wsContent);
+          }
           res.writeHead(200, {
             "content-type": "text/html",
             "cache-control": "no-cache",

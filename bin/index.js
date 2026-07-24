@@ -4,9 +4,10 @@ const spawn = require("../lib/cross-spawn");
 const script = process.argv[2];
 
 if (script == "dev") process.env.NODE_ENV = "development";
-else if (script == "build") process.env.NODE_ENV = "production";
+else if (["build", "start"].includes(script))
+  process.env.NODE_ENV = "production";
 
-if (typeof script !== undefined && ["dev", "build"].includes(script)) {
+if (typeof script !== undefined && ["dev", "build", "start"].includes(script)) {
   const result = spawn.sync("node", [path.resolve(__dirname, script + ".js")], {
     stdio: "inherit",
   });
