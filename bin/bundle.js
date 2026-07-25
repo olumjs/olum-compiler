@@ -2,7 +2,7 @@ const path = require("path");
 const fs = require("fs");
 const colors = require("../lib/colors");
 const spawn = require("../lib/cross-spawn");
-const { useLocalCore, localLibs } = require("../lib/coreLibs");
+const { useLocalCore, localLibs, optionalLibs } = require("../lib/coreLibs");
 
 const cwd = process.cwd();
 const public = path.resolve(__dirname, "../public");
@@ -93,6 +93,12 @@ async function bundle(bootAt) {
     }
   }
 
+  const external = useLocalCore
+    ? []
+    : optionalLibs.filter(
+        (pkgName) => !fs.existsSync(path.join(root, "node_modules", pkgName)),
+      );
+
   const buildResult = await build({
     root: public,
     resolve: { alias },
@@ -102,6 +108,7 @@ async function bundle(bootAt) {
 
       assetsInlineLimit: 0,
       rollupOptions: {
+        external,
         output: {
           assetFileNames(info) {
             const orig = (info.originalFileNames || [])[0];
