@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const http = require("http");
 
-const jsdom = require("jsdom");
+const { parseDOM } = require("../lib/dom");
 const colors = require("../lib/colors");
 const mimes = require("./mimes.json");
 let wsPort = 8090;
@@ -58,7 +58,7 @@ function serve(entry, port, mode = "development") {
             res.end("index.html not found");
             return reject(err);
           }
-          const dom = new jsdom.JSDOM(content.toString()).window.document;
+          const dom = parseDOM(content.toString());
           const html = dom.querySelector("html");
           if (mode == "development") {
             const wsContent = handleWsFile();

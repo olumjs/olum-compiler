@@ -128,7 +128,7 @@ check(
 );
 
 check(
-  "comparison operators in a text {expr} survive the jsdom round-trip",
+  "comparison operators in a text {expr} survive the parse5 round-trip",
   comp(`<p>{state.width > 380 && state.width < 800 ? 'mid' : 'other'}</p>`),
   (out) =>
     /olum\.esc\(state\.width > 380 && state\.width < 800 \? 'mid' : 'other'\)/.test(
