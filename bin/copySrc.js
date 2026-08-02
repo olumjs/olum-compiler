@@ -2,10 +2,19 @@ const path = require("path");
 const fs = require("fs");
 const { copy, compileRoutes } = require("../lib/helpers");
 const importMap = require("../lib/importMap");
+const usage = require("../lib/usage");
 
 const cwd = process.cwd();
 const entryPoint = path.resolve(cwd.replace(/\/module$/, ""), "src");
 const entryPoint2 = path.resolve(cwd.replace(/\/module$/, ""), "public");
+
+const devtoolSrc = path.resolve(
+  cwd.replace(/\/module$/, ""),
+  "node_modules/olum-devtool/dist",
+);
+const devtoolScript = path.resolve(devtoolSrc, "./script.js");
+const devtoolEnabled =
+  process.env.NODE_ENV === "development" && fs.existsSync(devtoolScript);
 
 const srcDest = path.resolve(__dirname, "../src");
 const publicDest = path.resolve(__dirname, "../public");
@@ -14,12 +23,15 @@ const mainJsPathDest = path.resolve(__dirname, "../src/main.js");
 
 function injectIndexHtml(indexHtmlPath) {
   let indexHtmlContent = fs.readFileSync(indexHtmlPath).toString();
+  const devtoolScriptContent = devtoolEnabled
+    ? "<script>" + fs.readFileSync(devtoolScript).toString() + "</script>\n"
+    : "";
 
   const importMapTag =
     process.env.NODE_ENV === "production" ? "" : `${importMap(entryPoint)}\n`;
   indexHtmlContent = indexHtmlContent.replace(
     /<\/body>/,
-    `\n<div id="app"></div>\n${importMapTag}<script defer type="module" src="../src/main.js"></script>\n</body>`,
+    `\n<div id="app"></div>\n${importMapTag}<script defer type="module" src="../src/main.js"></script>\n${devtoolScriptContent}</body>`,
   );
   fs.writeFileSync(indexHtmlPath, indexHtmlContent);
 }
@@ -42,8 +54,10 @@ function syncFile(event, file) {
     : path.join(publicDest, path.relative(entryPoint2, file));
   if (event.startsWith("unlink")) {
     fs.rmSync(dest, { recursive: true, force: true });
-    if (inSrc && dest.endsWith(".html"))
+    if (inSrc && dest.endsWith(".html")) {
       fs.rmSync(dest.replace(/\.html$/, ".js"), { force: true });
+      usage.drop(dest);
+    }
   } else {
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(file, dest);
@@ -74,6 +88,14 @@ module.exports = function copySrc(event, file) {
 
       copy(entryPoint, srcDest, () => handleMainJs());
       copy(entryPoint2, publicDest, () => injectIndexHtml(indexHtmlDest));
+
+      if (devtoolEnabled) {
+        fs.mkdirSync(publicDest + "/__olum_devtool", {
+          recursive: true,
+          force: true,
+        });
+        copy(devtoolSrc, publicDest + "/__olum_devtool");
+      }
 
       resolve(null);
     } catch (err) {

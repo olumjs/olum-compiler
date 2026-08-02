@@ -72,7 +72,33 @@ function serve(entry, port, mode = "development") {
         });
       }
 
+      function serveDevtools() {
+        const devtoolsPath = path.join(entry, "__olum_devtool", "index.html");
+
+        fs.readFile(devtoolsPath, (err, content) => {
+          if (err) {
+            res.writeHead(404, { "content-type": "text/plain" });
+            res.end("404 Not Found: " + urlPath);
+            return;
+          }
+          const dom = parseDOM(content.toString());
+          const html = dom.querySelector("html");
+          if (mode == "development") {
+            const wsContent = handleWsFile();
+            dom.body.insertAdjacentHTML("beforeend", wsContent);
+          }
+          res.writeHead(200, {
+            "content-type": "text/html",
+            "cache-control": "no-cache",
+          });
+          res.end("<!DOCTYPE html>" + html.outerHTML);
+        });
+      }
+
       if (urlPath === "/") return serveIndex();
+
+      if (urlPath === "/__olum_devtool" || urlPath === "/__olum_devtool/")
+        return serveDevtools();
 
       const finalPath = getPath(entry, urlPath);
       if (finalPath && fs.statSync(finalPath).isFile()) {
