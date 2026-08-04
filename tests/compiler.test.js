@@ -453,6 +453,122 @@ check(
     ) && parses(out),
 );
 
+section("§11a Nested components");
+
+check(
+  "a component nested directly inside another of the same name (both normal pairs)",
+  comp(
+    `<Spinner><Spinner></Spinner></Spinner>`,
+    `import Spinner from "./Spinner";`,
+  ),
+  (out) =>
+    /<olum name="Spinner"><olum name="Spinner"><\/olum><\/olum>/.test(
+      tmpl(out),
+    ) && parses(out),
+);
+
+check(
+  "a component wrapping multiple same-named children pairs with its OWN close tag",
+  comp(
+    `<KbdGroup><Kbd>Ctrl</Kbd><Kbd>Alt</Kbd><Kbd>Del</Kbd></KbdGroup>`,
+    `import KbdGroup from "./KbdGroup";\nimport Kbd from "./Kbd";`,
+  ),
+  (out) =>
+    /<olum name="KbdGroup">\s*<olum name="Kbd">Ctrl<\/olum>\s*<olum name="Kbd">Alt<\/olum>\s*<olum name="Kbd">Del<\/olum>\s*<\/olum>/.test(
+      tmpl(out),
+    ) && parses(out),
+);
+
+check(
+  "a component wrapping differently-named children (each with its own props) nests correctly",
+  comp(
+    `<Card variant="outline"><CardHeader>Title</CardHeader><CardContent>Body</CardContent></Card>`,
+    `import Card from "./Card";\nimport CardHeader from "./CardHeader";\nimport CardContent from "./CardContent";`,
+  ),
+  (out) =>
+    /<olum name="Card" data-o-props/.test(tmpl(out)) &&
+    /<olum name="CardHeader">Title<\/olum>/.test(tmpl(out)) &&
+    /<olum name="CardContent">Body<\/olum>/.test(tmpl(out)) &&
+    parses(out),
+);
+
+check(
+  "a child component name that is a PREFIX of the parent's name doesn't confuse pairing (Card / CardHeader)",
+  comp(
+    `<Card><CardHeader>Hi</CardHeader></Card>`,
+    `import Card from "./Card";\nimport CardHeader from "./CardHeader";`,
+  ),
+  (out) =>
+    /<olum name="Card">\s*<olum name="CardHeader">Hi<\/olum>\s*<\/olum>/.test(
+      tmpl(out),
+    ) && parses(out),
+);
+
+check(
+  "same-name recursive nesting depth-tracks correctly (Tree > Tree > Tree)",
+  comp(
+    `<Tree label="root"><Tree label="child"><Tree label="grandchild" /></Tree></Tree>`,
+    `import Tree from "./Tree";`,
+  ),
+  (out) =>
+    /<olum name="Tree"[\s\S]*<olum name="Tree"[\s\S]*<olum name="Tree"[\s\S]*<\/olum>\s*<\/olum>\s*<\/olum>/.test(
+      tmpl(out),
+    ) && parses(out),
+);
+
+check(
+  "three levels of different-named nesting all convert (Accordion > AccordionItem > AccordionTrigger/Content)",
+  comp(
+    `<Accordion multiple="{true}"><AccordionItem value="a"><AccordionTrigger>Q</AccordionTrigger><AccordionContent>A</AccordionContent></AccordionItem></Accordion>`,
+    `import Accordion from "./Accordion";\nimport AccordionItem from "./AccordionItem";\nimport AccordionTrigger from "./AccordionTrigger";\nimport AccordionContent from "./AccordionContent";`,
+  ),
+  (out) =>
+    /<olum name="Accordion"/.test(tmpl(out)) &&
+    /<olum name="AccordionItem"/.test(tmpl(out)) &&
+    /<olum name="AccordionTrigger">Q<\/olum>/.test(tmpl(out)) &&
+    /<olum name="AccordionContent">A<\/olum>/.test(tmpl(out)) &&
+    parses(out),
+);
+
+check(
+  "self-closing and normal component siblings mix correctly inside plain HTML",
+  comp(
+    `<div class="row"><Button variant="outline">Click</Button><Badge /><Button>Second</Button></div>`,
+    `import Button from "./Button";\nimport Badge from "./Badge";`,
+  ),
+  (out) =>
+    /<olum name="Button" data-o-props[\s\S]*>Click<\/olum>/.test(
+      tmpl(out),
+    ) &&
+    /<olum name="Badge"><\/olum>/.test(tmpl(out)) &&
+    /<olum name="Button">Second<\/olum>/.test(tmpl(out)) &&
+    parses(out),
+);
+
+check(
+  "attributes split across lines and indented with tabs keep the component name intact",
+  comp(
+    `<div>\n\t<Foo\n\t\tbar="1"\n\t\tbaz="2">x</Foo>\n</div>`,
+    `import Foo from "./Foo";`,
+  ),
+  (out) =>
+    /<olum name="Foo" data-o-props=/.test(tmpl(out)) &&
+    /bar: '1', baz: '2'/.test(tmpl(out)) &&
+    parses(out),
+);
+
+check(
+  "an unbalanced component tag is left alone, but the components inside it still convert",
+  comp(
+    `<div><Foo>a<Bar>b</Bar></div>`,
+    `import Foo from "./Foo";\nimport Bar from "./Bar";`,
+  ),
+  (out) =>
+    !/<olum name="Foo"/.test(tmpl(out)) &&
+    /<olum name="Bar">b<\/olum>/.test(tmpl(out)) &&
+    parses(out),
+);
+
 section("§11b Function props");
 
 check(
@@ -918,7 +1034,7 @@ if (failed) {
   console.log("");
 }
 
-const EXPECTED_CHECKS = 81;
+const EXPECTED_CHECKS = 90;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(
