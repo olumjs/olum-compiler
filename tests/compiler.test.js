@@ -537,9 +537,7 @@ check(
     `import Button from "./Button";\nimport Badge from "./Badge";`,
   ),
   (out) =>
-    /<olum name="Button" data-o-props[\s\S]*>Click<\/olum>/.test(
-      tmpl(out),
-    ) &&
+    /<olum name="Button" data-o-props[\s\S]*>Click<\/olum>/.test(tmpl(out)) &&
     /<olum name="Badge"><\/olum>/.test(tmpl(out)) &&
     /<olum name="Button">Second<\/olum>/.test(tmpl(out)) &&
     parses(out),
