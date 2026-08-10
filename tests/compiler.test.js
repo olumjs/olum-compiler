@@ -1019,8 +1019,6 @@ section("§24 Barrel splitting");
 
 const splitBarrels = require("../lib/barrelSplit");
 
-// splitBarrels reads the dependency off disk, so these run against throwaway
-// packages instead of a compiled template.
 const fixtureRoot = fs.mkdtempSync(nodePath.join(os.tmpdir(), "olum-barrel-"));
 
 function pkg(name, files) {
@@ -1131,9 +1129,9 @@ pkg("shifted-barrel", {
 });
 
 split(
-  "leaves the barrel alone when the pattern matches but resolves nowhere",
+  "names the target through the pattern, not by its path on disk",
   `import { A } from "shifted-barrel";`,
-  untouched(`import { A } from "shifted-barrel";`),
+  (out) => /^import \{ A as A \} from "shifted-barrel\/A\.js";$/.test(out),
 );
 
 pkg("flat-barrel", {
@@ -1153,9 +1151,62 @@ split(
 );
 
 split(
-  "leaves a subpath import alone",
+  "leaves a subpath import alone when it isn't a barrel",
   `import { A } from "wildcard-barrel/dist/A.js";`,
   untouched(`import { A } from "wildcard-barrel/dist/A.js";`),
+);
+
+pkg("nested-barrel", {
+  "package.json": {
+    name: "nested-barrel",
+    exports: {
+      ".": "./dist/index.js",
+      "./sub": "./dist/sub/index.js",
+      "./*.js": "./dist/*.js",
+    },
+  },
+  "dist/index.js": BARREL,
+  "dist/A.js": "export const A = 1;",
+  "dist/B.js": "export const B = 2;",
+  "dist/sub/index.js": `export { C } from "./C.js";\n`,
+  "dist/sub/C.js": "export const C = 3;",
+});
+
+split(
+  "splits a barrel reached through a subpath",
+  `import { C } from "nested-barrel/sub";`,
+  (out) => /^import \{ C as C \} from "nested-barrel\/sub\/C\.js";$/.test(out),
+);
+
+pkg("legacy-nested-barrel", {
+  "package.json": { name: "legacy-nested-barrel", main: "./index.js" },
+  "index.js": BARREL,
+  "A.js": "export const A = 1;",
+  "B.js": "export const B = 2;",
+  "sub/index.js": `export { C } from "./C.js";\n`,
+  "sub/C.js": "export const C = 3;",
+});
+
+split(
+  "splits a subpath barrel in a package with no exports field",
+  `import { C } from "legacy-nested-barrel/sub";`,
+  (out) =>
+    /^import \{ C as C \} from "legacy-nested-barrel\/sub\/C\.js";$/.test(out),
+);
+
+pkg("opaque-barrel", {
+  "package.json": {
+    name: "opaque-barrel",
+    exports: { ".": "./index.js", "./icons/*": "./dist/icons/*.js" },
+  },
+  "index.js": `export { A } from "./dist/icons/A.js";\n`,
+  "dist/icons/A.js": "export const A = 1;",
+});
+
+split(
+  "leaves the barrel alone when the import map can't express the pattern",
+  `import { A } from "opaque-barrel";`,
+  untouched(`import { A } from "opaque-barrel";`),
 );
 
 fs.rmSync(fixtureRoot, { recursive: true, force: true });
@@ -1228,7 +1279,7 @@ if (failed) {
   console.log("");
 }
 
-const EXPECTED_CHECKS = 105;
+const EXPECTED_CHECKS = 108;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(
