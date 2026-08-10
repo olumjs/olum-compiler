@@ -1015,6 +1015,202 @@ check(
     parses(out),
 );
 
+section("§24 Barrel splitting");
+
+const splitBarrels = require("../lib/barrelSplit");
+
+// splitBarrels reads the dependency off disk, so these run against throwaway
+// packages instead of a compiled template.
+const fixtureRoot = fs.mkdtempSync(nodePath.join(os.tmpdir(), "olum-barrel-"));
+
+function pkg(name, files) {
+  Object.keys(files).forEach((rel) => {
+    const file = nodePath.join(fixtureRoot, "node_modules", name, rel);
+    fs.mkdirSync(nodePath.dirname(file), { recursive: true });
+    fs.writeFileSync(
+      file,
+      typeof files[rel] === "string"
+        ? files[rel]
+        : JSON.stringify(files[rel], null, 2),
+    );
+  });
+}
+
+const split = (name, statement, assertion) =>
+  checkFn(name, () => splitBarrels(statement, fixtureRoot), assertion);
+
+const BARREL = `export { A } from "./A.js";\nexport { B } from "./B.js";\n`;
+const untouched = (statement) => (out) => out === statement;
+
+pkg("legacy-barrel", {
+  "package.json": { name: "legacy-barrel", main: "./index.js" },
+  "index.js": BARREL,
+  "A.js": "export const A = 1;",
+  "B.js": "export const B = 2;",
+});
+
+split(
+  "splits a barrel in a package with no exports field",
+  `import { A } from "legacy-barrel";`,
+  (out) => /^import \{ A as A \} from "legacy-barrel\/A\.js";$/.test(out),
+);
+
+pkg("guarded-barrel", {
+  "package.json": {
+    name: "guarded-barrel",
+    exports: { ".": "./dist/index.js", "./extra": "./dist/extra/index.js" },
+  },
+  "dist/index.js": BARREL,
+  "dist/A.js": "export const A = 1;",
+  "dist/B.js": "export const B = 2;",
+});
+
+split(
+  "leaves the barrel alone when the target isn't in the exports map",
+  `import { A } from "guarded-barrel";`,
+  untouched(`import { A } from "guarded-barrel";`),
+);
+
+pkg("wildcard-barrel", {
+  "package.json": {
+    name: "wildcard-barrel",
+    exports: { ".": "./dist/index.js", "./dist/*": { import: "./dist/*" } },
+  },
+  "dist/index.js": BARREL,
+  "dist/A.js": "export const A = 1;",
+  "dist/B.js": "export const B = 2;",
+});
+
+split(
+  "splits when a wildcard subpath exposes the target",
+  `import { A, B } from "wildcard-barrel";`,
+  (out) =>
+    /from "wildcard-barrel\/dist\/A\.js"/.test(out) &&
+    /from "wildcard-barrel\/dist\/B\.js"/.test(out),
+);
+
+pkg("blocked-barrel", {
+  "package.json": {
+    name: "blocked-barrel",
+    exports: { ".": "./dist/index.js", "./dist/*": null },
+  },
+  "dist/index.js": BARREL,
+  "dist/A.js": "export const A = 1;",
+  "dist/B.js": "export const B = 2;",
+});
+
+split(
+  "leaves the barrel alone when a wildcard maps the target to null",
+  `import { A } from "blocked-barrel";`,
+  untouched(`import { A } from "blocked-barrel";`),
+);
+
+pkg("escaping-barrel", {
+  "package.json": {
+    name: "escaping-barrel",
+    exports: { ".": "./dist/index.js", "./dist/*": "./dist/*" },
+  },
+  "dist/index.js": `export { A } from "../outside.js";\n`,
+  "outside.js": "export const A = 1;",
+});
+
+split(
+  "leaves the barrel alone when a re-export escapes the package root",
+  `import { A } from "escaping-barrel";`,
+  untouched(`import { A } from "escaping-barrel";`),
+);
+
+pkg("shifted-barrel", {
+  "package.json": {
+    name: "shifted-barrel",
+    exports: { ".": "./dist/index.js", "./*.js": "./dist/*.js" },
+  },
+  "dist/index.js": BARREL,
+  "dist/A.js": "export const A = 1;",
+  "dist/B.js": "export const B = 2;",
+});
+
+split(
+  "leaves the barrel alone when the pattern matches but resolves nowhere",
+  `import { A } from "shifted-barrel";`,
+  untouched(`import { A } from "shifted-barrel";`),
+);
+
+pkg("flat-barrel", {
+  "package.json": {
+    name: "flat-barrel",
+    exports: { ".": "./index.js", "./*.js": "./*.js" },
+  },
+  "index.js": BARREL,
+  "A.js": "export const A = 1;",
+  "B.js": "export const B = 2;",
+});
+
+split(
+  "splits when the substituted pattern lands on a real file",
+  `import { A } from "flat-barrel";`,
+  (out) => /^import \{ A as A \} from "flat-barrel\/A\.js";$/.test(out),
+);
+
+split(
+  "leaves a subpath import alone",
+  `import { A } from "wildcard-barrel/dist/A.js";`,
+  untouched(`import { A } from "wildcard-barrel/dist/A.js";`),
+);
+
+fs.rmSync(fixtureRoot, { recursive: true, force: true });
+
+section("§25 Import map subpaths");
+
+const { subpathImports } = require("../lib/importMap");
+
+const mapOf = (name, exports, assertion) =>
+  checkFn(name, () => subpathImports({ exports }, "pkg"), assertion);
+
+mapOf(
+  "falls back to a prefix mapping when there is no exports field",
+  undefined,
+  (out) => out["pkg/"] === "/node_modules/pkg/",
+);
+
+mapOf(
+  "maps each subpath alias to its real file and drops the prefix mapping",
+  { ".": "./dist/index.js", "./lucide": "./dist/lucide/index.js" },
+  (out) =>
+    out["pkg/lucide"] === "/node_modules/pkg/dist/lucide/index.js" &&
+    !("pkg/" in out),
+);
+
+mapOf(
+  "resolves a subpath given as a conditions object",
+  { "./lucide": { browser: "./dist/lucide/index.js", default: "./x.js" } },
+  (out) => out["pkg/lucide"] === "/node_modules/pkg/dist/lucide/index.js",
+);
+
+mapOf(
+  "turns a trailing wildcard into a prefix mapping",
+  { "./dist/*": "./dist/*" },
+  (out) => out["pkg/dist/"] === "/node_modules/pkg/dist/",
+);
+
+mapOf(
+  "turns a wildcard with a matching suffix into a prefix mapping",
+  { "./*.js": "./dist/*.js" },
+  (out) => out["pkg/"] === "/node_modules/pkg/dist/",
+);
+
+mapOf(
+  "skips a wildcard an import map can't express",
+  { ".": "./index.js", "./icons/*": "./dist/icons/*.js" },
+  (out) => Object.keys(out).length === 0,
+);
+
+mapOf(
+  "skips a subpath the package blocks with null",
+  { ".": "./index.js", "./internal": null },
+  (out) => Object.keys(out).length === 0,
+);
+
 console.log("\n========================");
 const summary = `${passed} passed, ${failed} failed`;
 console.log((failed ? red(bold(summary)) : green(bold(summary))) + "\n");
@@ -1032,7 +1228,7 @@ if (failed) {
   console.log("");
 }
 
-const EXPECTED_CHECKS = 90;
+const EXPECTED_CHECKS = 105;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(
