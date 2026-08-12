@@ -1,12 +1,14 @@
 const path = require("path");
 const fs = require("fs");
-const { copy, compileRoutes } = require("../lib/helpers");
+const { copy, compileRoutes, ls, isFile } = require("../lib/helpers");
 const importMap = require("../lib/importMap");
 const usage = require("../lib/usage");
+const splitJsBarrels = require("../lib/jsBarrels");
 
 const cwd = process.cwd();
-const entryPoint = path.resolve(cwd.replace(/\/module$/, ""), "src");
-const entryPoint2 = path.resolve(cwd.replace(/\/module$/, ""), "public");
+const projectRoot = cwd.replace(/\/module$/, "");
+const entryPoint = path.resolve(projectRoot, "src");
+const entryPoint2 = path.resolve(projectRoot, "public");
 
 const devtoolSrc = path.resolve(
   cwd.replace(/\/module$/, ""),
@@ -36,6 +38,13 @@ function injectIndexHtml(indexHtmlPath) {
   fs.writeFileSync(indexHtmlPath, indexHtmlContent);
 }
 
+function splitCopiedJs() {
+  ls(srcDest, { absolute: true }).forEach((file) => {
+    if (isFile(file) && file.endsWith(".js"))
+      splitJsBarrels.file(file, projectRoot);
+  });
+}
+
 function handleMainJs() {
   if (fs.existsSync(mainJsPathDest)) return;
   const mainJsContent = compileRoutes(entryPoint);
@@ -61,6 +70,7 @@ function syncFile(event, file) {
   } else {
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(file, dest);
+    if (inSrc && dest.endsWith(".js")) splitJsBarrels.file(dest, projectRoot);
     if (dest === indexHtmlDest) injectIndexHtml(dest);
   }
 
@@ -86,7 +96,10 @@ module.exports = function copySrc(event, file) {
       fs.rmSync(publicDest, { recursive: true, force: true });
       fs.rmSync(srcDest, { recursive: true, force: true });
 
-      copy(entryPoint, srcDest, () => handleMainJs());
+      copy(entryPoint, srcDest, () => {
+        splitCopiedJs();
+        handleMainJs();
+      });
       copy(entryPoint2, publicDest, () => injectIndexHtml(indexHtmlDest));
 
       if (devtoolEnabled) {
