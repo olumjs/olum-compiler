@@ -239,6 +239,41 @@ check(
 );
 
 check(
+  "several on* attributes on ONE element all survive, joined by OLUM_EVT_SEP",
+  comp(
+    `<input oninput="draft($event)" onblur="save()" />`,
+    `const draft = (e) => 0; const save = () => 0;`,
+  ),
+  (out) => {
+    const t = tmpl(out);
+    return (
+      /oninput\|draft=/.test(t) &&
+      /onblur\|save=/.test(t) &&
+      t.split("OLUM_EVT_SEP").length === 2 &&
+      parses(out)
+    );
+  },
+);
+
+check(
+  "a third event on the same element is appended too (2 separators)",
+  comp(
+    `<div onmousedown="down()" onmousemove="move()" onmouseup="up()"></div>`,
+    `const down = () => 0; const move = () => 0; const up = () => 0;`,
+  ),
+  (out) => {
+    const t = tmpl(out);
+    return (
+      /onmousedown\|down=/.test(t) &&
+      /onmousemove\|move=/.test(t) &&
+      /onmouseup\|up=/.test(t) &&
+      t.split("OLUM_EVT_SEP").length === 3 &&
+      parses(out)
+    );
+  },
+);
+
+check(
   "$event is forwarded to the handler",
   comp(`<input oninput="setVal($event)" />`, `const setVal = (e) => 0;`),
   (out) =>
@@ -1279,7 +1314,7 @@ if (failed) {
   console.log("");
 }
 
-const EXPECTED_CHECKS = 108;
+const EXPECTED_CHECKS = 110;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(
