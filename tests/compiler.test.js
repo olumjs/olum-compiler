@@ -1297,6 +1297,71 @@ mapOf(
   (out) => Object.keys(out).length === 0,
 );
 
+section("§26 <style> extraction vs malformed markup");
+
+const CSS_BLOCK = `<style>\n  main#home {\n    padding: 20px;\n  }\n</style>`;
+function styleOf(out) {
+  const m = out.match(/__style__\(\) \{ return `([\s\S]*?)`;\}/);
+  return m ? m[1] : "";
+}
+function styleSplit(name, template) {
+  check(name, comp(template + "\n" + CSS_BLOCK), (out) => {
+    const html = tmpl(out);
+    return (
+      !/<style/i.test(html) &&
+      !/olum\.esc\(\s*padding/.test(html) &&
+      /padding: 20px/.test(styleOf(out)) &&
+      parses(out)
+    );
+  });
+}
+
+const realWarn = console.warn;
+console.warn = () => {};
+
+styleSplit(
+  "keeps a plain <style> out of the markup",
+  `<main id="home">\n</main>`,
+);
+styleSplit(
+  "survives a self-closing <textarea />",
+  `<main id="home">\n  <textarea />\n</main>`,
+);
+styleSplit(
+  "survives a self-closing <title />",
+  `<main id="home">\n  <title />\n</main>`,
+);
+styleSplit(
+  "survives a self-closing <script src=... />",
+  `<script src="a.js" />\n<main id="home"></main>`,
+);
+styleSplit(
+  "survives an unterminated attribute quote",
+  `<main class="home>\n</main>`,
+);
+styleSplit(
+  "survives an unclosed <textarea>",
+  `<main id="home">\n  <textarea>hi\n</main>`,
+);
+styleSplit(
+  "survives a literal <script> written in text",
+  `<main id="home"><code><script></code></main>`,
+);
+
+check(
+  "a <style> inside a JS template literal stays in the script",
+  "<script>\n" +
+    STATE +
+    '\nconst t = `<style>x</style>`;\n</script>\n<main id="home"></main>\n' +
+    CSS_BLOCK,
+  (out) =>
+    /padding: 20px/.test(styleOf(out)) &&
+    !/<style/i.test(tmpl(out)) &&
+    parses(out),
+);
+
+console.warn = realWarn;
+
 console.log("\n========================");
 const summary = `${passed} passed, ${failed} failed`;
 console.log((failed ? red(bold(summary)) : green(bold(summary))) + "\n");
@@ -1314,7 +1379,7 @@ if (failed) {
   console.log("");
 }
 
-const EXPECTED_CHECKS = 110;
+const EXPECTED_CHECKS = 118;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(
