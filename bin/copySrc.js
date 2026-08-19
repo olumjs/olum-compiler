@@ -31,9 +31,14 @@ function injectIndexHtml(indexHtmlPath) {
 
   const importMapTag =
     process.env.NODE_ENV === "production" ? "" : `${importMap(entryPoint)}\n`;
+
+  const devFlagTag =
+    process.env.NODE_ENV === "production"
+      ? ""
+      : `<script>globalThis.__OLUM_DEV__ = true;</script>\n`;
   indexHtmlContent = indexHtmlContent.replace(
     /<\/body>/,
-    `\n<div id="app"></div>\n${importMapTag}<script defer type="module" src="../src/main.js"></script>\n${devtoolScriptContent}</body>`,
+    `\n<div id="app"></div>\n${devFlagTag}${importMapTag}<script defer type="module" src="../src/main.js"></script>\n${devtoolScriptContent}</body>`,
   );
   fs.writeFileSync(indexHtmlPath, indexHtmlContent);
 }

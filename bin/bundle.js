@@ -102,6 +102,8 @@ async function bundle(bootAt) {
   const buildResult = await build({
     root: public,
     resolve: { alias },
+
+    define: { "globalThis.__OLUM_DEV__": "false" },
     build: {
       outDir,
       emptyOutDir: true,

@@ -22,6 +22,10 @@ function compile(template) {
 function parses(out) {
   const body = out
     .replace(/^\s*import .*$/gm, "")
+    .replace(
+      /import __olumPkg from "olum";const olum=__olumPkg\.__olum\|\|window\.olum;/g,
+      "",
+    )
     .replace(/^\s*export\s+default\s+/m, "const __x=");
   new Function(body);
   return true;
