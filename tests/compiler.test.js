@@ -281,8 +281,9 @@ check(
   "$event is forwarded to the handler",
   comp(`<input oninput="setVal($event)" />`, `const setVal = (e) => 0;`),
   (out) =>
-    /oninput\|setVal=\$\{JSON\.stringify\(\['\$event'\]\)\}/.test(tmpl(out)) &&
-    parses(out),
+    /oninput\|setVal=\$\{encodeURIComponent\(JSON\.stringify\(\['\$event'\]\)\)/.test(
+      tmpl(out),
+    ) && parses(out),
 );
 check(
   "inline arrow handler becomes a named __olumAnon_ method",
