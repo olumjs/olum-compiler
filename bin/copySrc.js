@@ -38,7 +38,7 @@ function injectIndexHtml(indexHtmlPath) {
       : `<script>globalThis.__OLUM_DEV__ = true;</script>\n`;
   indexHtmlContent = indexHtmlContent.replace(
     /<\/body>/,
-    `\n<div id="app"></div>\n${devFlagTag}${importMapTag}<script defer type="module" src="../src/main.js"></script>\n${devtoolScriptContent}</body>`,
+    `\n<div id="olum-app"></div>\n${devFlagTag}${importMapTag}<script defer type="module" src="../src/main.js"></script>\n${devtoolScriptContent}</body>`,
   );
   fs.writeFileSync(indexHtmlPath, indexHtmlContent);
 }

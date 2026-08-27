@@ -891,7 +891,7 @@ checkFn(
       /err: "\/404",/.test(out) &&
       !/Widget|_drafts|Drafts/.test(out) &&
       /new Router\(config\)/.test(out) &&
-      /new Olum\(\)\.\$\("#app"\)\.use\(router\)/.test(out)
+      /new Olum\(\)\.\$\("olum-app"\)\.use\(router\)/.test(out)
     );
   },
 );
