@@ -5,6 +5,7 @@ const http = require("http");
 const { parseDOM } = require("../lib/dom");
 const colors = require("../lib/colors");
 const mimes = require("./mimes.json");
+const sitemapPath = path.resolve(__dirname, "../src/sitemap.js");
 let wsPort = 8090;
 
 function handleWsFile() {
@@ -44,12 +45,22 @@ function serve(entry, port, mode = "development") {
   return new Promise((resolve, reject) => {
     const PORT = Number(port || process.env.PORT || 3000);
 
+    const ssgHosting = fs.existsSync(sitemapPath);
+    const entryDir = path.resolve(entry);
+
+    function ssgIndex(urlPath) {
+      if (!ssgHosting || urlPath === "/") return null;
+      const nested = path.resolve(entryDir, "." + urlPath, "index.html");
+      if (!nested.startsWith(entryDir + path.sep)) return null;
+      return fs.existsSync(nested) ? nested : null;
+    }
+
     const server = http.createServer(handler);
     function handler(req, res) {
       const urlPath = req.url.split("?")[0];
 
       function serveIndex() {
-        let indexPath = entry + "/index.html";
+        let indexPath = ssgIndex(urlPath) || entry + "/index.html";
         if (!fs.existsSync(indexPath)) indexPath = entry + "/index.htm";
 
         fs.readFile(indexPath, (err, content) => {

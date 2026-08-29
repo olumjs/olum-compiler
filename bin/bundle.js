@@ -134,3 +134,4 @@ async function bundle(bootAt) {
 }
 
 module.exports = bundle;
+module.exports.ensureVite = ensureVite;

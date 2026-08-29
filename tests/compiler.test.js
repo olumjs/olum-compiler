@@ -891,7 +891,7 @@ checkFn(
       /err: "\/404",/.test(out) &&
       !/Widget|_drafts|Drafts/.test(out) &&
       /new Router\(config\)/.test(out) &&
-      /new Olum\(\)\.\$\("olum-app"\)\.use\(router\)/.test(out)
+      /new Olum\(\)\.\$\("#olum-app"\)\.use\(router\)/.test(out)
     );
   },
 );
@@ -1367,6 +1367,167 @@ check(
 
 console.warn = realWarn;
 
+section("§27 <head> page metadata");
+
+function compilePage(template, file) {
+  return parser(template, _idSeq++, file || "/app/src/match/[slug]/page.html");
+}
+function headOf(out) {
+  const m = out.match(/__head__\(\) \{ return `([\s\S]*?)`;\},/);
+  return m ? m[1] : "";
+}
+function checkHead(name, template, assertion, file) {
+  let out;
+  try {
+    out = compilePage(template, file);
+  } catch (e) {
+    recordFail(name);
+    console.log(
+      "  " + FAIL_ICON + " " + name + dim("  (threw: " + e.message + ")"),
+    );
+    console.log("      " + dim("↳ in " + currentSection));
+    return;
+  }
+  let ok = false;
+  try {
+    ok = assertion(out);
+  } catch (e) {}
+  if (ok) {
+    passed++;
+    console.log("  " + PASS_ICON + " " + name);
+  } else {
+    recordFail(name);
+    console.log(
+      "  " +
+        FAIL_ICON +
+        " " +
+        red(name) +
+        "\n      " +
+        dim("head: " + headOf(out).replace(/\s+/g, " ").slice(0, 140)),
+    );
+    console.log("      " + dim("↳ in " + currentSection));
+  }
+}
+
+const PAGE_HEAD = `<head>\n  <title>Hi</title>\n  <meta name="description" content="d" />\n</head>`;
+
+checkHead(
+  "moves the head out of the markup and into __head__",
+  PAGE_HEAD + `\n<script>${STATE}</script>\n<main>{state.name}</main>`,
+  (out) =>
+    !/<meta|<title/i.test(tmpl(out)) &&
+    /<title>Hi<\/title>/.test(headOf(out)) &&
+    parses(out),
+);
+
+checkHead(
+  "a head written BELOW the script is still extracted",
+  `<script>${STATE}</script>\n` + PAGE_HEAD + `\n<main>x</main>`,
+  (out) =>
+    !/<meta|<title/i.test(tmpl(out)) &&
+    /content="d"/.test(headOf(out)) &&
+    parses(out),
+);
+
+checkHead(
+  "compiles {expr} in the head against the script scope",
+  `<head>\n  <title>{state.name}</title>\n</head>\n<script>${STATE}</script>\n<main>x</main>`,
+  (out) =>
+    /<title>\$\{olum\.esc\(state\.name\)\}<\/title>/.test(headOf(out)) &&
+    parses(out),
+);
+
+checkHead(
+  "leaves JSON-LD braces alone",
+  `<head>\n  <script type="application/ld+json">\n    { "@type": "WebSite", "name": "Site" }\n  </script>\n</head>\n<script>${STATE}</script>\n<main>x</main>`,
+  (out) =>
+    /\{ "@type": "WebSite", "name": "Site" \}/.test(headOf(out)) &&
+    !/olum\.esc/.test(headOf(out)) &&
+    parses(out),
+);
+
+checkHead(
+  "interpolates JSON-LD only inside a quoted string, and raw (no esc)",
+  `<head>\n  <script type="application/ld+json">\n    { "@type": "Thing", "name": "{state.name}" }\n  </script>\n</head>\n<script>${STATE}</script>\n<main>x</main>`,
+  (out) =>
+    /"name": "\$\{state\.name\}"/.test(headOf(out)) &&
+    /\{ "@type": "Thing"/.test(headOf(out)) &&
+    parses(out),
+);
+
+checkHead(
+  "escapes a backtick and a backslash typed in the head",
+  '<head>\n  <meta name="a" content="`x` C:\\path" />\n</head>\n<script>' +
+    STATE +
+    "</script>\n<main>x</main>",
+  (out) => /\\`x\\` C:\\\\path/.test(headOf(out)) && parses(out),
+);
+
+checkHead(
+  "a ${expr} in the head interpolates like it does in the markup",
+  "<head>\n  <title>${state.name}</title>\n</head>\n<script>" +
+    STATE +
+    "</script>\n<main>${state.name}</main>",
+  (out) =>
+    /<title>\$\$\{olum\.esc\(state\.name\)\}<\/title>/.test(headOf(out)) &&
+    /\$\$\{olum\.esc\(state\.name\)\}/.test(tmpl(out)) &&
+    parses(out),
+);
+
+checkHead(
+  "keeps the script's original line number under a multi-line head",
+  `<head>\n  <title>Hi</title>\n</head>\n\n<script>${STATE}</script>\n<main>x</main>`,
+  (out) =>
+    out
+      .split("\n")
+      .slice(0, 4)
+      .every((line) => line === "//") && !/^\/\//.test(out.split("\n")[4]),
+);
+
+checkHead(
+  "a component with no head emits no __head__",
+  `<script>${STATE}</script>\n<main>x</main>`,
+  (out) => !/__head__/.test(out) && parses(out),
+);
+
+console.warn = () => {};
+
+checkHead(
+  "ignores a <head> in a component that is not a page",
+  PAGE_HEAD + `\n<script>${STATE}</script>\n<main>x</main>`,
+  (out) =>
+    !/__head__/.test(out) && !/<meta|<title/i.test(tmpl(out)) && parses(out),
+  "/app/src/components/Card.html",
+);
+
+checkHead(
+  "ignores an unclosed <head> instead of swallowing the file",
+  `<head>\n  <title>Hi</title>\n<script>${STATE}</script>\n<main id="home">x</main>`,
+  (out) => !/__head__/.test(out) && /id="home"/.test(tmpl(out)) && parses(out),
+);
+
+checkHead(
+  "compiles only the FIRST head and drops the second",
+  PAGE_HEAD +
+    `\n<head>\n  <meta name="robots" content="noindex" />\n</head>\n<script>${STATE}</script>\n<main>x</main>`,
+  (out) =>
+    /<title>Hi<\/title>/.test(headOf(out)) &&
+    !/robots/.test(headOf(out)) &&
+    !/robots/.test(tmpl(out)) &&
+    parses(out),
+);
+
+checkHead(
+  "a <head> inside a JS string stays in the script",
+  `<script>${STATE}\nconst t = "<head><title>no</title></head>";</script>\n<main>x</main>`,
+  (out) =>
+    !/__head__/.test(out) &&
+    /<head><title>no<\/title><\/head>/.test(out) &&
+    parses(out),
+);
+
+console.warn = realWarn;
+
 console.log("\n========================");
 const summary = `${passed} passed, ${failed} failed`;
 console.log((failed ? red(bold(summary)) : green(bold(summary))) + "\n");
@@ -1384,7 +1545,7 @@ if (failed) {
   console.log("");
 }
 
-const EXPECTED_CHECKS = 118;
+const EXPECTED_CHECKS = 131;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(
