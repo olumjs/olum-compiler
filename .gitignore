@@ -1,2 +1,4 @@
 node_modules
 lib/changes.txt
+routes.json
+.olum-ssg
