@@ -156,8 +156,9 @@ function siteUrl() {
   return "";
 }
 
+const DEFAULT_DELAY = 500;
 function readDelay(raw, source) {
-  if (raw === undefined || raw === null || raw === "") return 0;
+  if (raw === undefined || raw === null || raw === "") return DEFAULT_DELAY;
 
   const ms =
     typeof raw === "number" || typeof raw === "string" ? Number(raw) : NaN;
@@ -166,7 +167,7 @@ function readDelay(raw, source) {
     fail(
       `ignoring ${source} — expected a number of milliseconds, got ${shown}`,
     );
-    return 0;
+    return DEFAULT_DELAY;
   }
   return Math.round(ms);
 }
@@ -181,7 +182,7 @@ function ssgDelay() {
       'package.json "olum.SSG_DELAY"',
     );
   } catch (err) {
-    return 0;
+    return DEFAULT_DELAY;
   }
 }
 
