@@ -197,14 +197,17 @@ const xmlEscape = (str) =>
     .replace(/'/g, "&apos;");
 
 function writeSitemapXml(finalRoutes) {
+  const has404 = finalRoutes.find((item) => item == "/404");
   const base = siteUrl();
   if (!base)
     fail(
       'no package.json "olum.SITE_URL" — sitemap.xml falls back to relative paths, which crawlers ignore',
     );
 
-  const urls = finalRoutes.filter((route) =>
-    fs.existsSync(path.join(distDir, route, "index.html")),
+  const urls = finalRoutes.filter(
+    (route) =>
+      route !== "/404" &&
+      fs.existsSync(path.join(distDir, route, "index.html")),
   );
   const lastmod = new Date().toISOString().slice(0, 10);
   const body = urls
@@ -218,6 +221,12 @@ function writeSitemapXml(finalRoutes) {
     path.join(distDir, "sitemap.xml"),
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`,
   );
+
+  if (has404 && fs.existsSync(path.join(distDir, "404", "index.html")))
+    fs.copyFileSync(
+      path.join(distDir, "404", "index.html"),
+      path.join(distDir, "404.html"),
+    );
   return urls.length;
 }
 
