@@ -861,7 +861,7 @@ function withRouteTree(files, fn) {
 }
 
 checkFn(
-  "route tree compiles: / first, /404 last, [param] -> :param, (group) and NN- prefixes stripped",
+  "route tree compiles: / first, /404 last, [param] -> :param, (group) stripped and NN- kept as an identifier suffix",
   () =>
     withRouteTree(
       [
@@ -882,9 +882,9 @@ checkFn(
       /import NotFound from "\.\/not-found\.js";/.test(out) &&
       /import About from "\.\/about\/page\.js";/.test(out) &&
       /import Club from "\.\/\(main\)\/club\/page\.js";/.test(out) &&
-      /import BlogSlug from "\.\/01-blog\/\[slug\]\/page\.js";/.test(out) &&
+      /import BlogSlug_01 from "\.\/01-blog\/\[slug\]\/page\.js";/.test(out) &&
       /\{ path: "\/club", comp: Club \}/.test(out) &&
-      /\{ path: "\/blog\/:slug", comp: BlogSlug \}/.test(out) &&
+      /\{ path: "\/blog\/:slug", comp: BlogSlug_01 \}/.test(out) &&
       /\{ path: "\/about", comp: About \}/.test(out) &&
       paths[0] === "/" &&
       paths[paths.length - 1] === "/404" &&
@@ -894,6 +894,19 @@ checkFn(
       /new Olum\(\)\.\$\("#olum-app"\)\.use\(router\)/.test(out)
     );
   },
+);
+
+checkFn(
+  "NN- siblings get distinct identifiers instead of colliding",
+  () =>
+    withRouteTree(["01-blog/page.html", "02-blog/page.html"], (root) =>
+      compileRoutes(root),
+    ),
+  (out) =>
+    /import Blog_01 from "\.\/01-blog\/page\.js";/.test(out) &&
+    /import Blog_02 from "\.\/02-blog\/page\.js";/.test(out) &&
+    /comp: Blog_01 \}/.test(out) &&
+    /comp: Blog_02 \}/.test(out),
 );
 
 checkFn(
@@ -1528,6 +1541,203 @@ checkHead(
 
 console.warn = realWarn;
 
+section("§28 Path aliases");
+
+const resolveAlias = require("../lib/alias");
+const toJs = require("../lib/toJs");
+
+const aliasRoot = fs.mkdtempSync(nodePath.join(os.tmpdir(), "olum-alias-"));
+const plainRoot = fs.mkdtempSync(nodePath.join(os.tmpdir(), "olum-noalias-"));
+
+fs.writeFileSync(
+  nodePath.join(aliasRoot, "package.json"),
+  JSON.stringify({
+    olum: {
+      SITE_URL: "https://example.com",
+      alias: {
+        "@": "./src",
+        "#": "./src/utils",
+        "@components": "./src/components",
+        "@app": "./src",
+        "@app/ui": "./src/design/ui",
+      },
+    },
+  }),
+);
+fs.writeFileSync(
+  nodePath.join(plainRoot, "package.json"),
+  JSON.stringify({ olum: { SITE_URL: "https://example.com" } }),
+);
+
+const inSrc = (rel) => nodePath.join(aliasRoot, "src", rel);
+
+const alias = (name, spec, importer, assertion) =>
+  checkFn(name, () => resolveAlias(spec, importer, aliasRoot), assertion);
+
+const same = (spec) => (out) => out === spec;
+
+alias(
+  "a single alias resolves against the project root",
+  "@/utils/foo.js",
+  inSrc("page.js"),
+  (out) => out === "./utils/foo.js",
+);
+
+alias(
+  "a second alias points at its own directory",
+  "#/foo.js",
+  inSrc("page.js"),
+  (out) => out === "./utils/foo.js",
+);
+
+alias(
+  "a nested importer walks back up to the target",
+  "@/utils/foo.js",
+  inSrc("pages/blog/post.html"),
+  (out) => out === "../../utils/foo.js",
+);
+
+alias(
+  "a nested target keeps its whole subpath",
+  "@/a/b/c/foo.js",
+  inSrc("page.js"),
+  (out) => out === "./a/b/c/foo.js",
+);
+
+alias(
+  "the bare alias itself resolves to its directory",
+  "#",
+  inSrc("page.js"),
+  (out) => out === "./utils",
+);
+
+alias(
+  "a relative import is left to the existing resolver",
+  "./foo.js",
+  inSrc("page.js"),
+  same("./foo.js"),
+);
+
+alias(
+  "a parent-relative import is left to the existing resolver",
+  "../foo.js",
+  inSrc("pages/post.js"),
+  same("../foo.js"),
+);
+
+alias(
+  "a package import is left to the existing resolver",
+  "lodash",
+  inSrc("page.js"),
+  same("lodash"),
+);
+
+alias(
+  'a scoped package is not an alias match for "@"',
+  "@scope/pkg",
+  inSrc("page.js"),
+  same("@scope/pkg"),
+);
+
+alias(
+  "an alias only matches on an exact name or a following slash",
+  "@foo",
+  inSrc("page.js"),
+  same("@foo"),
+);
+
+alias(
+  "overlapping aliases pick the longest match",
+  "@app/ui/Button.js",
+  inSrc("page.js"),
+  (out) => out === "./design/ui/Button.js",
+);
+
+alias(
+  "@components wins over @ for @components/Button.js",
+  "@components/Button.js",
+  inSrc("page.js"),
+  (out) => out === "./components/Button.js",
+);
+
+checkFn(
+  "no alias config leaves every specifier untouched",
+  () =>
+    resolveAlias(
+      "@/utils/foo.js",
+      nodePath.join(plainRoot, "src/page.js"),
+      plainRoot,
+    ),
+  same("@/utils/foo.js"),
+);
+
+const jsOf = (name, statement, importer, assertion) =>
+  checkFn(name, () => toJs(statement, importer, aliasRoot), assertion);
+
+jsOf(
+  "an aliased component import comes out as a relative .js path",
+  `import Foo from "@/comps/Foo.html"`,
+  inSrc("page.html"),
+  (out) => out === `import Foo from "./comps/Foo.js";`,
+);
+
+jsOf(
+  "an aliased import with no extension still gets .js",
+  `import foo from "#/foo"`,
+  inSrc("page.html"),
+  (out) => out === `import foo from "./utils/foo.js";`,
+);
+
+jsOf(
+  "a relative import keeps the behaviour it had",
+  `import foo from "./a"`,
+  inSrc("page.html"),
+  (out) => out === `import foo from "./a.js";`,
+);
+
+jsOf(
+  "a package import keeps the behaviour it had",
+  `import foo from "lodash"`,
+  inSrc("page.html"),
+  (out) => out === `import foo from "lodash";`,
+);
+
+jsOf(
+  "a side-effect import resolves its alias and keeps its extension",
+  `import "@/styles/app.css"`,
+  inSrc("page.html"),
+  (out) => out === `import "./styles/app.css"`,
+);
+
+checkFn(
+  "a plain .js file has its aliased imports rewritten, strings left alone",
+  () =>
+    resolveAlias.rewriteImports(
+      `import foo from "@/utils/foo.js";\nimport bar from "./bar.js";\nexport { baz } from "#/baz.js";\nconst snippet = \`import x from "@/x.js";\`;\n`,
+      inSrc("api.js"),
+      aliasRoot,
+    ),
+  (out) =>
+    /import foo from "\.\/utils\/foo\.js";/.test(out) &&
+    /import bar from "\.\/bar\.js";/.test(out) &&
+    /export \{ baz \} from "\.\/utils\/baz\.js";/.test(out) &&
+    /const snippet = `import x from "@\/x\.js";`;/.test(out),
+);
+
+checkFn(
+  "the import map scan knows an aliased path is not a package",
+  () => [
+    resolveAlias.isAlias("@/utils/foo.js", aliasRoot),
+    resolveAlias.isAlias("@scope/pkg", aliasRoot),
+    resolveAlias.isAlias("lodash", aliasRoot),
+    resolveAlias.isAlias("@/utils/foo.js", plainRoot),
+  ],
+  (out) => String(out) === "true,false,false,false",
+);
+
+fs.rmSync(aliasRoot, { recursive: true, force: true });
+fs.rmSync(plainRoot, { recursive: true, force: true });
+
 console.log("\n========================");
 const summary = `${passed} passed, ${failed} failed`;
 console.log((failed ? red(bold(summary)) : green(bold(summary))) + "\n");
@@ -1545,7 +1755,7 @@ if (failed) {
   console.log("");
 }
 
-const EXPECTED_CHECKS = 131;
+const EXPECTED_CHECKS = 152;
 const total = passed + failed;
 if (total !== EXPECTED_CHECKS) {
   console.log(

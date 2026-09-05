@@ -4,6 +4,7 @@ const { copy, compileRoutes, ls, isFile } = require("../lib/helpers");
 const importMap = require("../lib/importMap");
 const usage = require("../lib/usage");
 const splitJsBarrels = require("../lib/jsBarrels");
+const resolveAliases = require("../lib/alias");
 
 const cwd = process.cwd();
 const projectRoot = cwd.replace(/\/module$/, "");
@@ -45,8 +46,10 @@ function injectIndexHtml(indexHtmlPath) {
 
 function splitCopiedJs() {
   ls(srcDest, { absolute: true }).forEach((file) => {
-    if (isFile(file) && file.endsWith(".js"))
+    if (isFile(file) && file.endsWith(".js")) {
+      resolveAliases.file(file, projectRoot);
       splitJsBarrels.file(file, projectRoot);
+    }
   });
 }
 
@@ -75,7 +78,10 @@ function syncFile(event, file) {
   } else {
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(file, dest);
-    if (inSrc && dest.endsWith(".js")) splitJsBarrels.file(dest, projectRoot);
+    if (inSrc && dest.endsWith(".js")) {
+      resolveAliases.file(dest, projectRoot);
+      splitJsBarrels.file(dest, projectRoot);
+    }
     if (dest === indexHtmlDest) injectIndexHtml(dest);
   }
 
