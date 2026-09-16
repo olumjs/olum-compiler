@@ -18,6 +18,50 @@ function getLogs() {
   }
 }
 
+function resolveBase() {
+  let conf;
+  try {
+    const pkg = JSON.parse(
+      fs.readFileSync(path.join(root, "package.json"), "utf8"),
+    );
+    conf = pkg.olum && (pkg.olum.base || pkg.olum.BASE);
+  } catch (err) {}
+  if (typeof conf !== "string" || !conf.trim()) return "/";
+
+  const value = conf.trim();
+  if (/[\s"'<>`]/.test(value)) {
+    console.error(
+      colors(
+        "red",
+        'ignoring package.json "olum.base" — expected "./", "/" or a sub-path like "/app/"',
+      ),
+    );
+    return "/";
+  }
+  if (value.startsWith(".")) return "./";
+  if (/^(https?:)?\/\//.test(value)) return value.replace(/\/*$/, "/");
+  return ("/" + value.replace(/^\/+/, "")).replace(/\/*$/, "/");
+}
+
+function staticUrlPlugin(base) {
+  const urlAttr = /((?:src|href|poster)=\\?["'])\/([^"'`\\?#\s]+\.[a-z0-9]+)/gi;
+
+  return {
+    name: "olum:static-urls",
+    apply: "build",
+    enforce: "post",
+    renderChunk(code) {
+      let changed = false;
+      const out = code.replace(urlAttr, (match, head, url) => {
+        if (!fs.existsSync(path.join(public, url))) return match;
+        changed = true;
+        return head + base + url;
+      });
+      return changed ? { code: out, map: null } : null;
+    },
+  };
+}
+
 function copyStatic(from, to, absorbed) {
   for (const name of fs.readdirSync(from)) {
     const src = path.join(from, name);
@@ -99,9 +143,15 @@ async function bundle(bootAt) {
         (pkgName) => !fs.existsSync(path.join(root, "node_modules", pkgName)),
       );
 
+  const base = resolveBase();
+  if (base !== "/")
+    console.log(colors("white", `building with base "${base}"`));
+
   const buildResult = await build({
     root: public,
+    base,
     resolve: { alias },
+    plugins: base === "/" ? [] : [staticUrlPlugin(base)],
 
     define: { "globalThis.__OLUM_DEV__": "false" },
     build: {
