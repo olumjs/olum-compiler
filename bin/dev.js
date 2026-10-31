@@ -50,7 +50,7 @@ process.on("exit", () => read() === me && fs.rmSync(lockFile, { force: true }));
   process.on(signal, () => process.exit(0)),
 );
 
-serve(entryPoint).then(({ server, wsPort, PORT, log, setWsPort }) => {
+serve(entryPoint).then(({ server, PORT, log }) => {
   const bootAt = Date.now();
   copySrc()
     .then(() => {
@@ -70,17 +70,14 @@ serve(entryPoint).then(({ server, wsPort, PORT, log, setWsPort }) => {
         );
         require("../lib/compiler");
 
-        (function startWs(port) {
-          const wss = new WebSocket.Server({ server });
-          sockets = wss.clients;
-          wss.on("listening", () => setWsPort(port));
-          wss.on("error", (e) => {
-            if (e.code === "EADDRINUSE") startWs(port + 1);
-          });
-          wss.on("connection", (ws) =>
-            ws.send(JSON.stringify({ msg: "connected" })),
-          );
-        })(wsPort);
+        const wss = new WebSocket.Server({ server });
+        sockets = wss.clients;
+        wss.on("error", (e) => {
+          if (e.code !== "EADDRINUSE") console.error(e);
+        });
+        wss.on("connection", (ws) =>
+          ws.send(JSON.stringify({ msg: "connected" })),
+        );
       });
     })
     .catch(console.error);

@@ -6,11 +6,9 @@ const { parseDOM } = require("../lib/dom");
 const colors = require("../lib/colors");
 const mimes = require("./mimes.json");
 const sitemapPath = path.resolve(__dirname, "../src/sitemap.js");
-let wsPort = 8090;
 
 function handleWsFile() {
   let file = fs.readFileSync(path.resolve(__dirname, "./ws.js")).toString();
-
   file = "<script>" + file + "</script>";
   return file;
 }
@@ -159,16 +157,7 @@ function serve(entry, port, mode = "development") {
     }
     const log = colors("cyan", "Serving ") + colors("green", "port " + PORT);
 
-    const setWsPort = (port) => {
-      wsPort = port;
-    };
-    resolve({
-      server: server,
-      wsPort: wsPort,
-      PORT: PORT,
-      log: log,
-      setWsPort: setWsPort,
-    });
+    resolve({ server: server, PORT: PORT, log: log });
   });
 }
 
