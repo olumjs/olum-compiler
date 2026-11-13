@@ -6,6 +6,8 @@
 </p>
 
 # Olum-Compiler
+A module for compiling/bundling Olumjs projects.
+
 See [Documentation](https://olumjs.top/docs)
 
 ## Contributing
@@ -54,7 +56,7 @@ Not sure which one is the latest? Check the branch list on GitHub (or run `git b
    ```bash
    git push origin feat/my-awesome-feature
    ```
-10. **Open a Pull Request** against the **latest version branch** (e.g. `v2.1.3`) — *not* an older version. Describe what changed, why, and include a small example if it's user-facing.
+10. **Open a Pull Request** against the **latest version branch** (e.g. `v2.1.3`) — *not* `v2.1.0` or an older version. Describe what changed, why, and include a small example if it's user-facing.
 
 ### Docs are part of the change
 User-facing documentation lives on [olumjs.top/docs](https://olumjs.top/docs). If your PR changes behavior or adds a feature, mention in the PR description what the docs need so they can be updated alongside it. No docs change needed? Just say so (e.g. internal refactor).
