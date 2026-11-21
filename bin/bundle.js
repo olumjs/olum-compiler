@@ -3,6 +3,21 @@ const fs = require("fs");
 const colors = require("../lib/colors");
 const spawn = require("../lib/cross-spawn");
 const { useLocalCore, localLibs, optionalLibs } = require("../lib/coreLibs");
+const env = require("../lib/env");
+
+function envDefine() {
+  const vars = env.load();
+  const runtime = "globalThis.process.env";
+  const define = {
+    "process.env": runtime,
+    "global.process.env": runtime,
+    "globalThis.process.env": runtime,
+  };
+  for (const key of Object.keys(vars))
+    if (/^[A-Za-z_$][\w$]*$/.test(key))
+      define[`process.env.${key}`] = JSON.stringify(vars[key]);
+  return define;
+}
 
 const cwd = process.cwd();
 const public = path.resolve(__dirname, "../public");
@@ -153,7 +168,7 @@ async function bundle(bootAt) {
     resolve: { alias },
     plugins: base === "/" ? [] : [staticUrlPlugin(base)],
 
-    define: { "globalThis.__OLUM_DEV__": "false" },
+    define: { "globalThis.__OLUM_DEV__": "false", ...envDefine() },
     build: {
       outDir,
       emptyOutDir: true,

@@ -5,6 +5,7 @@ const importMap = require("../lib/importMap");
 const usage = require("../lib/usage");
 const splitJsBarrels = require("../lib/jsBarrels");
 const resolveAliases = require("../lib/alias");
+const env = require("../lib/env");
 
 const cwd = process.cwd();
 const projectRoot = cwd.replace(/\/module$/, "");
@@ -37,6 +38,11 @@ function injectIndexHtml(indexHtmlPath) {
     process.env.NODE_ENV === "production"
       ? ""
       : `<script>globalThis.__OLUM_DEV__ = true;</script>\n`;
+
+  indexHtmlContent = indexHtmlContent.replace(
+    /<head[^>]*>/i,
+    (tag) => `${tag}\n${env.scriptTag()}`,
+  );
   indexHtmlContent = indexHtmlContent.replace(
     /<\/body>/,
     `\n<div id="olum-app"></div>\n${devFlagTag}${importMapTag}<script defer type="module" src="../src/main.js"></script>\n${devtoolScriptContent}</body>`,
