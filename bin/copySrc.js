@@ -24,6 +24,7 @@ const srcDest = path.resolve(__dirname, "../src");
 const publicDest = path.resolve(__dirname, "../public");
 const indexHtmlDest = path.resolve(__dirname, "../public/index.html");
 const mainJsPathDest = path.resolve(__dirname, "../src/main.js");
+const ENV_IMPORT = 'import "./__olum_env.js";';
 
 function injectIndexHtml(indexHtmlPath) {
   let indexHtmlContent = fs.readFileSync(indexHtmlPath).toString();
@@ -38,11 +39,6 @@ function injectIndexHtml(indexHtmlPath) {
     process.env.NODE_ENV === "production"
       ? ""
       : `<script>globalThis.__OLUM_DEV__ = true;</script>\n`;
-
-  indexHtmlContent = indexHtmlContent.replace(
-    /<head[^>]*>/i,
-    (tag) => `${tag}\n${env.scriptTag()}`,
-  );
   indexHtmlContent = indexHtmlContent.replace(
     /<\/body>/,
     `\n<div id="olum-app"></div>\n${devFlagTag}${importMapTag}<script defer type="module" src="../src/main.js"></script>\n${devtoolScriptContent}</body>`,
@@ -59,11 +55,23 @@ function splitCopiedJs() {
   });
 }
 
-function handleMainJs() {
-  if (fs.existsSync(mainJsPathDest)) return;
-  const mainJsContent = compileRoutes(entryPoint);
+function importEnv() {
+  const mainJs = fs.readFileSync(mainJsPathDest, "utf8");
+  if (!mainJs.startsWith(ENV_IMPORT))
+    fs.writeFileSync(mainJsPathDest, `${ENV_IMPORT}\n${mainJs}`);
+}
 
-  fs.writeFileSync(mainJsPathDest, mainJsContent);
+function handleMainJs() {
+  if (!fs.existsSync(mainJsPathDest)) {
+    fs.writeFileSync(mainJsPathDest, compileRoutes(entryPoint));
+  }
+  if (process.env.NODE_ENV !== "production") {
+    fs.writeFileSync(
+      path.resolve(srcDest, "__olum_env.js"),
+      env.moduleSource(),
+    );
+    importEnv();
+  }
 }
 
 function syncFile(event, file) {
@@ -99,6 +107,7 @@ function syncFile(event, file) {
       dest === mainJsPathDest);
   if (affectsRoutes && !fs.existsSync(path.join(entryPoint, "main.js")))
     fs.writeFileSync(mainJsPathDest, compileRoutes(entryPoint));
+  if (inSrc && (dest === mainJsPathDest || affectsRoutes)) importEnv();
   return dest;
 }
 

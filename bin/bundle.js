@@ -7,12 +7,7 @@ const env = require("../lib/env");
 
 function envDefine() {
   const vars = env.load();
-  const runtime = "globalThis.process.env";
-  const define = {
-    "process.env": runtime,
-    "global.process.env": runtime,
-    "globalThis.process.env": runtime,
-  };
+  const define = {};
   for (const key of Object.keys(vars))
     if (/^[A-Za-z_$][\w$]*$/.test(key))
       define[`process.env.${key}`] = JSON.stringify(vars[key]);
